@@ -3,6 +3,7 @@
   'use strict';
   const DB_NAME = 'supertux-downloaded-assets-v1';
   const LIMIT = 384 * 1024 * 1024;
+  const MUSIC_DOWNLOAD_IDLE_TIMEOUT_MS = 30000;
   const hex = bytes => Array.from(new Uint8Array(bytes), b => b.toString(16).padStart(2, '0')).join('');
   const hash = async bytes => hex(await root.crypto.subtle.digest('SHA-256', bytes));
   const valid = async (bytes, entry) => bytes instanceof ArrayBuffer && bytes.byteLength === entry.bytes && await hash(bytes) === entry.sha256;
@@ -135,23 +136,47 @@
       const gzip = typeof root.DecompressionStream === 'function' && entry.encodings?.gzip;
       const url = new URL(gzip ? gzip.url : entry.url, root.location.href);
       if (url.origin !== root.location.origin) throw new Error('Asset URL must use the game origin');
-      const response = await root.fetch(url.href, {cache: 'no-store'});
-      if (response.status !== 200) throw new Error('Asset download failed (HTTP ' + response.status + ')');
-      const bytes = new Uint8Array(entry.bytes);
-      const stream = gzip ? response.body.pipeThrough(new root.DecompressionStream('gzip')) : response.body;
-      const reader = stream.getReader();
-      let offset = 0;
-      for (;;) {
-        const {done, value} = await reader.read();
-        if (done) break;
-        if (offset + value.length > bytes.length) { await reader.cancel(); throw new Error('Asset download has the wrong size'); }
-        bytes.set(value, offset); offset += value.length;
-        if (progress) progress(offset, entry.bytes);
+      // Optional music must release its slot even if fetch or a body read
+      // never settles. Give each network wait a fresh inactivity deadline.
+      const controller = entry.kind === 'music' ? new root.AbortController() : null;
+      const wait = async operation => {
+        if (!controller) return operation;
+        let timer;
+        try {
+          return await Promise.race([operation, new Promise((_, reject) => {
+            timer = setTimeout(() => {
+              reject(new Error('Music download timed out'));
+              controller.abort();
+            }, MUSIC_DOWNLOAD_IDLE_TIMEOUT_MS);
+          })]);
+        } finally { clearTimeout(timer); }
+      };
+      let reader;
+      try {
+        const response = await wait(root.fetch(url.href, {cache: 'no-store', ...(controller ? {signal:controller.signal} : {})}));
+        if (response.status !== 200) throw new Error('Asset download failed (HTTP ' + response.status + ')');
+        const bytes = new Uint8Array(entry.bytes);
+        const stream = gzip ? response.body.pipeThrough(new root.DecompressionStream('gzip')) : response.body;
+        reader = stream.getReader();
+        let offset = 0;
+        for (;;) {
+          const {done, value} = await wait(reader.read());
+          if (done) break;
+          if (offset + value.length > bytes.length) throw new Error('Asset download has the wrong size');
+          bytes.set(value, offset); offset += value.length;
+          if (progress) progress(offset, entry.bytes);
+        }
+        if (!await valid(bytes.buffer, entry)) throw new Error('Asset download is incomplete or damaged');
+        this.stats.networkBytes += entry.bytes;
+        this.cache.store(entry, bytes.buffer, epoch);
+        return bytes.buffer;
+      } catch (error) {
+        if (controller) controller.abort();
+        // Cancellation is best effort; a stuck transport must not hold the
+        // queue hostage while its cancellation promise settles.
+        if (reader) reader.cancel().catch(() => {});
+        throw error;
       }
-      if (!await valid(bytes.buffer, entry)) throw new Error('Asset download is incomplete or damaged');
-      this.stats.networkBytes += entry.bytes;
-      this.cache.store(entry, bytes.buffer, epoch);
-      return bytes.buffer;
     }
     allowed() {
       const shell = this.Module.supertuxShell;

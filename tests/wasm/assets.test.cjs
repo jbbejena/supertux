@@ -27,7 +27,7 @@ async function fixture() {
   const Module = {supertuxShell:{active:true,muted:false}, FS:{mkdirTree(){},writeFile(path,value){files.set(path,value)}}};
   const cache = {epoch:0,read:async e => stored.get(e.sha256),store(e,buffer){stored.set(e.sha256,buffer)}};
   const loader = new Loader(Module, {assets:entries,runtimeRoot:'/data',inventorySha256:'identity'}, cache);
-  global.fetch = url => new Promise((resolve,reject) => requests.push({url,resolve,reject}));
+  global.fetch = (url,options) => new Promise((resolve,reject) => requests.push({url,resolve,reject,signal:options?.signal}));
   return {a,b,entries,files,stored,requests,Module,loader};
 }
 
@@ -64,6 +64,83 @@ test('partial failure is not cached/mounted; explicit retry succeeds', async () 
   f.loader.retry(); await tick(); f.requests[1].resolve(new Response(f.a)); await tick(); await tick();
   await until(() => f.loader.tracks.get('music/a.ogg').state === 0);
   assert.equal(f.loader.requestTrack('music/a.ogg'), 0);
+});
+
+test('stalled music response headers time out and explicit retry succeeds', async t => {
+  t.mock.timers.enable({apis:['setTimeout']});
+  const f = await fixture();
+  f.loader.requestTrack('music/a.ogg'); await tick();
+  t.mock.timers.tick(30000);
+  await until(() => f.loader.active === 0);
+  assert.equal(f.requests[0].signal.aborted, true);
+  assert.equal(f.loader.tracks.get('music/a.ogg').state, 2);
+  assert.equal(elements.get('retry_music').hidden, false);
+  assert.equal(f.files.size, 0); assert.equal(f.stored.size, 0);
+  f.loader.retry(); await tick();
+  f.requests[1].resolve(new Response(f.a));
+  await until(() => f.loader.tracks.get('music/a.ogg').state === 0);
+  // A transport which ignores abort still cannot publish a late completion.
+  f.requests[0].resolve(new Response(f.a)); await tick();
+  assert.equal(f.loader.stats.networkBytes, f.a.byteLength);
+});
+
+test('stalled music bodies release both slots for the current queued track', async t => {
+  t.mock.timers.enable({apis:['setTimeout']});
+  const f = await fixture(), c = bytes('OggSqueued C');
+  f.loader.entries.set('music/c.ogg',{...f.entries[0],path:'music/c.ogg',bytes:c.byteLength,sha256:await hash(c),url:'assets/c'});
+  f.loader.requestTrack('music/a.ogg'); f.loader.requestTrack('music/b.ogg'); await tick();
+  let cancelled = 0;
+  for (const request of f.requests) {
+    request.resolve(new Response(new ReadableStream({
+      start(controller){controller.enqueue(new Uint8Array([1]));},
+      cancel(){++cancelled; return new Promise(() => {});}
+    })));
+  }
+  await tick();
+  f.loader.requestTrack('music/c.ogg');
+  assert.equal(f.loader.queue.length, 1);
+  t.mock.timers.tick(30000);
+  await until(() => f.requests.length === 3);
+  assert.equal(cancelled, 2);
+  assert.equal(f.requests[0].signal.aborted, true);
+  assert.equal(f.requests[1].signal.aborted, true);
+  assert.equal(f.files.size, 0); assert.equal(f.stored.size, 0);
+  f.requests[2].resolve(new Response(c));
+  await until(() => f.loader.active === 0);
+  assert.equal(f.loader.tracks.get('music/c.ogg').state, 0);
+  assert.equal(f.loader.queue.length, 0);
+  assert.deepEqual([...f.files.keys()], ['/data/music/c.ogg']);
+});
+
+test('music making progress can take longer than one inactivity deadline', async t => {
+  t.mock.timers.enable({apis:['setTimeout']});
+  const f = await fixture();
+  let body;
+  f.loader.requestTrack('music/a.ogg'); await tick();
+  t.mock.timers.tick(20000);
+  f.requests[0].resolve(new Response(new ReadableStream({start(controller){body=controller;}})));
+  await tick();
+  t.mock.timers.tick(20000);
+  body.enqueue(new Uint8Array(f.a).subarray(0,4)); await tick();
+  t.mock.timers.tick(20000);
+  body.enqueue(new Uint8Array(f.a).subarray(4)); body.close();
+  await until(() => f.loader.active === 0);
+  assert.equal(f.loader.tracks.get('music/a.ogg').state, 0);
+  assert.equal(f.requests[0].signal.aborted, false);
+  assert.equal(f.loader.stats.failures, 0);
+});
+
+test('invalid music releases its slot even when stream cancellation stalls', async () => {
+  const f = await fixture();
+  f.loader.requestTrack('music/a.ogg'); await tick();
+  f.requests[0].resolve(new Response(new ReadableStream({
+    start(controller){controller.enqueue(new Uint8Array(f.a.byteLength + 1));},
+    cancel(){return new Promise(() => {});}
+  })));
+  await until(() => f.loader.active === 0);
+  assert.equal(f.loader.tracks.get('music/a.ogg').state, 2);
+  assert.equal(f.requests[0].signal.aborted, true);
+  assert.equal(f.files.size, 0); assert.equal(f.stored.size, 0);
 });
 
 test('muted/inactive/background requests wait; corrupt cache falls back to network', async () => {
