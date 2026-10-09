@@ -382,7 +382,7 @@ async def run(args, url):
             await host.locator('#coop_create').click()
             await host.wait_for_function("document.querySelector('#coop_status').textContent.includes('Room ready')")
             await guest.goto(await host.locator('#coop_link').get_attribute('href'))
-            await guest.wait_for_function('supertuxGuest.state.connected')
+            await guest.wait_for_function('window.supertuxGuest?.state.connected')
             await host.wait_for_function('Module.supertuxCoop.state.reserved===1')
             await host.locator('#coop_panel').evaluate('(e)=>e.open=true')
             await host.locator('#coop_antarctica').click()
@@ -395,7 +395,7 @@ async def run(args, url):
             await sample('rejoin-fresh-input',lambda s:s[1]['right'] and not s[0]['right'])
             await guest.evaluate("Object.defineProperty(document,'hidden',{configurable:true,get:()=>true});document.dispatchEvent(new Event('visibilitychange'))")
             await host.wait_for_function('Module.supertuxCoop.state.reserved===-1 && !Module.supertuxShell.active && !Module.supertuxCoop.state.enabled')
-            report['checks'].append('Return to title preserves saves; a new invitation and level accept fresh P2 input; guest background closes its socket and pauses the host')
+            report['checks'].append('Return to title preserves saves; a new invitation opened in the same guest tab retires old credentials and accepts fresh P2 input; guest background closes its socket and pauses the host')
 
         # Verify the existing persistence path for both ordinary local co-op
         # and transient remote membership, including a real page reload.

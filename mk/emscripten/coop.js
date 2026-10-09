@@ -278,6 +278,12 @@
       button.addEventListener('contextmenu', event => event.preventDefault());
     }
     window.addEventListener('blur', clear);
+    window.addEventListener('hashchange', () => {
+      // Invitations keep credentials in the fragment. Opening a new room in
+      // this tab is a same-document navigation unless we retire this client.
+      ++joinEpoch; clear(); connection?.close('Joining the new invitation.');
+      location.reload();
+    });
     window.addEventListener('pagehide', () => { ++joinEpoch; clear(); connection?.close('Controller left. Rejoin from the host title screen.'); });
     document.addEventListener('visibilitychange', () => { if (document.hidden) { ++joinEpoch; clear(); connection?.close('Controller backgrounded. Rejoin from the host title screen.'); } });
     document.getElementById('guest_join').addEventListener('click', join);

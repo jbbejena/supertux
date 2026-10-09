@@ -140,6 +140,31 @@ test('guest heartbeat interruption discards held keys and cannot be bypassed by 
   await receive({type:'session',generation:4,enabled:true});assert.equal(socket.sent.at(-1).mask,0);
 });
 
+test('a new invitation in the same guest tab neutralizes the old room and reloads its credentials', async () => {
+  const f=fixture(true,async()=>({text:async()=>'<script>window.SUPERTUX_DEPLOY_CONFIG = '+JSON.stringify({manifestSha256:'c'.repeat(64)})+';</script>'}));
+  await new Promise(resolve=>setImmediate(resolve));
+  const socket=f.sockets[0],receive=value=>socket.fire('message',{data:JSON.stringify(value)});
+  await receive({type:'ready'});await receive({type:'session',generation:2,enabled:true});
+  await f.window.fire('keydown',{code:'ArrowRight',preventDefault(){},repeat:false});
+  let reloads=0;f.window.location.reload=()=>++reloads;
+  f.window.location.hash='#'+new URLSearchParams({room:'d'.repeat(32),token:'e'.repeat(64),build:'c'.repeat(64)});
+  await f.window.fire('hashchange');
+  assert.equal(reloads,1);assert.equal(socket.readyState,3);
+  assert.equal(f.window.supertuxGuest.state.mask,0);assert.equal(f.window.supertuxGuest.state.connected,false);
+  assert.equal(socket.sent.filter(value=>value.type==='input').at(-1).mask,0);
+  await receive({type:'session',generation:3,enabled:true});
+  assert.equal(f.window.supertuxGuest.state.enabled,false);
+});
+
+test('invitation change retires an identity fetch still pending for the old room', async () => {
+  let fetched,reloads=0;
+  const f=fixture(true,()=>new Promise(resolve=>fetched=resolve));
+  f.window.location.reload=()=>++reloads;await f.window.fire('hashchange');
+  fetched({text:async()=>'<script>window.SUPERTUX_DEPLOY_CONFIG = '+JSON.stringify({manifestSha256:'c'.repeat(64)})+';</script>'});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(reloads,1);assert.equal(f.sockets.length,0);
+});
+
 test('short native hitch retires delayed edges at the input watchdog without forcing a shared pause', async () => {
   const f=fixture(false,async()=>({ok:true,json:async()=>({room:'a'.repeat(32),guest:'b'.repeat(64),host:'d'.repeat(64),build:'c'.repeat(64)})}));
   await f.elements.get('coop_create').fire('click');const socket=f.sockets[0], engine=f.window.Module.supertuxCoop;

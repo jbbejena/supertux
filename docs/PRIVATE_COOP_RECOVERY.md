@@ -41,6 +41,9 @@ Resume. **Return to title** flushes the existing save/settings store and reloads
 the host. Create a new room, share its new guest invitation and restart the level.
 Mid-level reconnection and host migration remain unsupported. Guest backgrounding
 still ends its socket rather than silently accepting input from a hidden page.
+Opening a new invitation in the same guest tab clears controls, closes the old
+room and reloads the new credentials. Fragment-only navigation previously kept
+the old client's room identity and could prevent joining after a title restart.
 
 ## Bounds and scope
 
