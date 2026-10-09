@@ -31,8 +31,9 @@ remain in force.
 The game stays paused after the connection recovers. The host presses the existing
 trusted **Resume** button, preserving browser audio activation. Welcome to
 Antarctica obtains a fresh complete baseline acknowledgment for the current input
-generation before simulation resumes. An acknowledgment for an older generation
-does not release the loading gate. Deliberate shell pauses do not consume that
+generation before simulation resumes. An acknowledgment for an older generation,
+including one arriving between native reset and its next status callback, does
+not release the loading gate. Deliberate shell pauses do not consume that
 gate's loading timeout.
 
 A permanently disconnected guest or host socket pauses the host and blocks

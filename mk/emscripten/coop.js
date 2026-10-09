@@ -46,13 +46,14 @@
 
   function host(module) {
     const queue = [], status = document.getElementById('coop_status');
-    let relayInterrupted = false, lost = false, recoveryPaused = false, retiredGeneration = null, lastStall = 0, lastFrame = performance.now();
+    let relayInterrupted = false, lost = false, recoveryPaused = false, retiredGeneration = null, pauseGeneration = null, lastStall = 0, lastFrame = performance.now();
     let sceneDeadline = 0, sceneKey = null, sceneLoaded = null, connection, creating = false, createEpoch = 0, joinRejected = false, guestView = false, lastView = 0, state = {reserved: 0, enabled: false, generation: 0, sequence: 0}, lastSent = '';
     const say = text => { if (status) status.textContent = text; };
     const interrupt = (reason, permanent = false) => {
       if (state.reserved !== 1) return;
       lost ||= permanent;
       recoveryPaused = true;
+      pauseGeneration = state.generation;
       queue.length = 0;
       sceneLoaded = null;
       sceneDeadline = 0;
@@ -81,6 +82,10 @@
     module.supertuxCoop = {
       enqueue, poll: () => queue.shift(),
       onPause() {
+        // Native reset is synchronous, but engineStatus is reported at the
+        // next frame. Do not let an old acknowledgment refill this gate in
+        // that interval, including when Resume is pressed immediately.
+        pauseGeneration = state.generation;
         sceneLoaded = null; sceneDeadline = 0;
         enqueue([4, 0, 0, 0]);
         session();
@@ -99,6 +104,7 @@
       },
       engineStatus(reserved, enabled, generation, sequence) {
         state = {reserved, enabled: !!enabled, generation, sequence};
+        if (generation !== pauseGeneration) pauseGeneration = null;
         if (generation !== retiredGeneration) retiredGeneration = null;
         if (enabled && module.supertuxShell?.active) recoveryPaused = false;
         const key = `${reserved}/${enabled}/${generation}`;
@@ -109,7 +115,7 @@
         if (connection?.ready && reserved === -1 && !joinRejected) say('Player 2 disconnected. Return to the title screen, rejoin, then start a level.');
         if (connection?.ready && joinRejected) say('Join requires one local player at the title screen. Return there and rejoin before starting a level; reload if local Player 2 was already configured.');
       },
-      get state() { return {...state, queued: queue.length, joinRejected, relayInterrupted, lost, recoveryPaused, lastStall}; },
+      get state() { return {...state, queued: queue.length, joinRejected, relayInterrupted, lost, recoveryPaused, awaitingNativeReset:pauseGeneration !== null, lastStall}; },
       get connection() { return connection; },
       wantsView() {return !!(connection?.ready && guestView && state.reserved === 1 && state.generation && Date.now() - lastView >= 100);},
       sceneReady(session, epoch) {
@@ -137,7 +143,7 @@
       if (creating || !module.supertuxReady) return;
       if (lost || state.reserved === 1) {say('Close the current room and return to the title screen before creating a new invitation.');return;}
       const epoch = ++createEpoch;
-      creating = true; sceneDeadline=0;sceneKey = sceneLoaded = null; joinRejected = false; connection?.close(); relayInterrupted = lost = recoveryPaused = false; retiredGeneration = null; enqueue([3, 0, 0, 0]);
+      creating = true; sceneDeadline=0;sceneKey = sceneLoaded = null; joinRejected = false; connection?.close(); relayInterrupted = lost = recoveryPaused = false; retiredGeneration = pauseGeneration = null; enqueue([3, 0, 0, 0]);
       const restart = document.getElementById('coop_restart');
       if (restart) restart.hidden = true;
       try {
@@ -160,7 +166,7 @@
               if (!value.connected) interrupt('Player 2 disconnected. Return to the title screen and create a new room.', true);
               guestView = !!(value.connected && value.view); joinRejected = false; enqueue([value.connected ? 1 : 3, 0, 0, 0]);
             }
-            if (value.type === 'view-ready' && value.generation === state.generation && `${value.session}/${value.epoch}` === sceneKey) sceneLoaded = sceneKey;
+            if (value.type === 'view-ready' && pauseGeneration === null && value.generation === state.generation && `${value.session}/${value.epoch}` === sceneKey) sceneLoaded = sceneKey;
             if (value.type === 'input') {
               const gap = performance.now() - lastFrame;
               if (state.enabled && module.supertuxShell?.active) {

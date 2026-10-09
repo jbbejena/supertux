@@ -155,6 +155,10 @@ test('ordinary browser pause sends neutral status immediately and invalidates th
   f.window.Module.supertuxShell.active=false;engine.onPause();
   assert.equal(socket.sent.filter(v=>v.type==='session').at(-1).enabled,false);
   assert.equal(engine.sceneReady(3,1),false);
+  await receive({type:'view-ready',session:3,epoch:1,generation:10});
+  f.window.Module.supertuxShell.active=true;
+  assert.equal(engine.sceneReady(3,1),false,'An acknowledgment in the pause/status race must not release Resume');
+  assert.equal(engine.state.awaitingNativeReset,true);
   f.window.Module.supertuxShell.active=true;engine.engineStatus(1,false,11,0);
   await receive({type:'view-ready',session:3,epoch:1,generation:10});assert.equal(engine.sceneReady(3,1),false);
   await receive({type:'view-ready',session:3,epoch:1,generation:11});assert.equal(engine.sceneReady(3,1),true);
