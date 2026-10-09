@@ -70,7 +70,13 @@
       enqueue([4, 0, 0, 0]);
     };
     const enqueue = value => {
-      if (value[0] !== 2) queue.length = 0;
+      if (value[0] !== 2) {
+        // A lifecycle reset retires controls, not a pending ownership change.
+        // Blur can arrive between peer notification and the native poll.
+        const peer = value[0] === 4 ? queue.findLast(command => command[0] === 1 || command[0] === 3) : null;
+        queue.length = 0;
+        if (peer) queue.push(peer);
+      }
       if (queue.length >= limit) { queue.length = 0; queue.push([4, 0, 0, 0]); say('Input backlog cleared. Release controls and try again.'); return; }
       queue.push(value);
     };

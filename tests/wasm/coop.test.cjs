@@ -41,6 +41,14 @@ test('host queue preserves taps and fails neutral on overflow', () => {
   assert.deepEqual(Array.from(input.poll()), [4,0,0,0]); assert.equal(input.poll(), undefined);
 });
 
+test('blur between peer notification and native poll retires controls without losing attach or detach', async () => {
+  const f=fixture(),engine=f.window.Module.supertuxCoop;
+  engine.enqueue([1,0,0,0]);engine.enqueue([2,1,1,2]);await f.window.fire('blur');
+  assert.deepEqual(Array.from(engine.poll()),[1,0,0,0]);assert.deepEqual(Array.from(engine.poll()),[4,0,0,0]);assert.equal(engine.poll(),undefined);
+  engine.enqueue([3,0,0,0]);engine.onPause();
+  assert.deepEqual(Array.from(engine.poll()),[3,0,0,0]);assert.deepEqual(Array.from(engine.poll()),[4,0,0,0]);assert.equal(engine.poll(),undefined);
+});
+
 test('retired sockets ignore late callbacks and outgoing backpressure closes', async () => {
   const f = fixture(); let received = 0;
   const connection = new f.window.SupertuxCoop.Connection('room','host','token','build',{message:()=>received++});
@@ -61,6 +69,7 @@ test('host pagehide prevents a pending create response opening a late socket', a
   complete({ok:true,json:async()=>({room:'a'.repeat(32),guest:'b'.repeat(64),host:'d'.repeat(64),build:'c'.repeat(64)})});
   await creating;
   assert.equal(f.sockets.length,0);
+  assert.deepEqual(Array.from(f.window.Module.supertuxCoop.poll()),[3,0,0,0]);
   assert.deepEqual(Array.from(f.window.Module.supertuxCoop.poll()),[4,0,0,0]);
 });
 

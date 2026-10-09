@@ -46,9 +46,20 @@ async def run(args, url):
         await host.locator('#coop_panel').evaluate('(e)=>e.open=true')
         await host.locator('#coop_create').click()
         await host.wait_for_function("document.querySelector('#coop_status').textContent.includes('Room ready')")
+        await host.evaluate('''() => {
+          const connection=Module.supertuxCoop.connection,message=connection.events.message;
+          connection.events.message=value=>{
+            message(value);
+            if(value.type==='peer' && value.connected){connection.events.message=message;window.dispatchEvent(new Event('blur'));}
+          };
+        }''')
         await guest.goto(await host.locator('#coop_view_link').get_attribute('href'))
         await guest.wait_for_function('supertuxGuest.state.connected',timeout=90000)
         await host.wait_for_function('Module.supertuxCoop.state.reserved===1')
+        await host.wait_for_function('!Module.supertuxShell.active && !Module.supertuxCoop.state.enabled')
+        await host.locator('#start_button').click()
+        await host.wait_for_function('Module.supertuxShell.active')
+        report['checks'].append('Blur between guest notification and native polling preserves the remote ownership command while retiring input; trusted Resume keeps Player 2 joined')
         await host.evaluate('''() => {
           window.lastViewPacket=null;const publish=Module.supertuxCoop.view;
           Module.supertuxCoop.view=frame=>{lastViewPacket=frame;publish(frame);};
