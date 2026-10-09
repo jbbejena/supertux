@@ -104,6 +104,8 @@
 
   function activate(withoutAudio) {
     if (!ready || failed || pending || document.hidden) return;
+    const recovery = Module.supertuxCoop?.canResume?.();
+    if (typeof recovery === 'string') { prompt(recovery); return; }
     const attempt = ++epoch;
     pending = true;
     muted = withoutAudio || !audio || audio.state === 'closed';
@@ -160,6 +162,7 @@
   Module.supertuxShell = {
     resize,
     resetInput,
+    pause,
     get active() { return active; },
     get muted() { return muted; },
     get audioState() { return audio ? audio.state : 'unavailable'; },

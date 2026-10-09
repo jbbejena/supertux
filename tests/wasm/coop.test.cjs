@@ -11,7 +11,7 @@ function target(extra = {}) {
 }
 function fixture(guest = false, fetch = async () => {throw Error('Unexpected fetch');}) {
   const elements = new Map(['coop_status','coop_panel','coop_create','coop_close','coop_link',
-    'coop_antarctica','coop_forest',...(guest ? ['guest_status','guest_join','guest_ack'] : [])]
+    'coop_antarctica','coop_forest','coop_restart',...(guest ? ['guest_status','guest_join','guest_ack'] : [])]
     .map(id => [id, target({textContent: ''})]));
   const sockets = [];
   class Socket {
@@ -21,12 +21,12 @@ function fixture(guest = false, fetch = async () => {throw Error('Unexpected fet
     close() {this.readyState = 3;}
   }
   const document = target({hidden: false, getElementById: id => elements.get(id), querySelectorAll: () => []});
-  const window = target({document, TextEncoder, URL, URLSearchParams, WebSocket: Socket, AbortSignal, fetch,
+  const window = target({document, TextEncoder, URL, URLSearchParams, WebSocket: Socket, AbortSignal, fetch, performance,
     location: {href: 'http://localhost/index.html', protocol: 'http:', search: '?coop=1',
       hash: '#'+new URLSearchParams({room:'a'.repeat(32),token:'b'.repeat(64),build:'c'.repeat(64)}).toString()},
     SUPERTUX_DEPLOY_CONFIG: {manifestSha256: 'c'.repeat(64)},
     setInterval: () => 1, clearInterval: () => {}, setTimeout, clearTimeout});
-  if (!guest) window.Module = {supertuxReady: true};
+  if (!guest) window.Module = {supertuxReady: true, supertuxShell: {active: true, pause(reason) {this.active = false; this.reason = reason;}}};
   window.window = window;
   vm.runInNewContext(source, window);
   return {window, document, elements, sockets};
@@ -88,9 +88,30 @@ test('native campaign load identity survives old title/background draws; restart
   await socket.fire('message',{data:JSON.stringify({type:'ready'})});
   await socket.fire('message',{data:JSON.stringify({type:'peer',connected:true,view:true})});
   engine.engineStatus(1,false,1,0);assert.equal(engine.sceneReady(3,1),false);
-  await socket.fire('message',{data:JSON.stringify({type:'view-ready',session:3,epoch:1})});assert.equal(engine.sceneReady(3,1),true);
+  await socket.fire('message',{data:JSON.stringify({type:'view-ready',session:3,epoch:1,generation:1})});assert.equal(engine.sceneReady(3,1),true);
   engine.view({session:1,epoch:1,scene:'unsupported'});assert.equal(engine.sceneReady(3,1),true);
   assert.equal(engine.sceneReady(3,2),false);
-  await socket.fire('message',{data:JSON.stringify({type:'view-ready',session:3,epoch:1})});assert.equal(engine.sceneReady(3,2),false);
-  await socket.fire('message',{data:JSON.stringify({type:'view-ready',session:3,epoch:2})});assert.equal(engine.sceneReady(3,2),true);
+  await socket.fire('message',{data:JSON.stringify({type:'view-ready',session:3,epoch:1,generation:1})});assert.equal(engine.sceneReady(3,2),false);
+  await socket.fire('message',{data:JSON.stringify({type:'view-ready',session:3,epoch:2,generation:1})});assert.equal(engine.sceneReady(3,2),true);
+});
+
+test('native frame stall pauses before input consumption; recovery needs a fresh baseline and explicit Resume', async () => {
+  const f=fixture(false,async()=>({ok:true,json:async()=>({room:'a'.repeat(32),guest:'b'.repeat(64),host:'d'.repeat(64),build:'c'.repeat(64)})}));
+  await f.elements.get('coop_create').fire('click');
+  const socket=f.sockets[0], engine=f.window.Module.supertuxCoop, shell=f.window.Module.supertuxShell;
+  const receive=value=>socket.fire('message',{data:JSON.stringify(value)});
+  await receive({type:'ready'}); await receive({type:'peer',connected:true,view:true}); engine.poll();
+  engine.engineStatus(1,true,4,0);
+  await receive({type:'input',generation:4,sequence:1,mask:2});
+  engine.beforeFrame(1600);
+  assert.equal(shell.active,false); assert.deepEqual(Array.from(engine.poll()),[4,0,0,0]); assert.equal(engine.poll(),undefined);
+  await receive({type:'input',generation:4,sequence:2,mask:2}); assert.equal(engine.poll(),undefined);
+  await receive({type:'connection',interrupted:true}); assert.equal(typeof engine.canResume(),'string');
+  engine.engineStatus(1,false,5,0); await receive({type:'connection',interrupted:false});
+  assert.equal(shell.active,false); assert.equal(engine.canResume(),true);
+  shell.active=true; assert.equal(engine.sceneReady(3,1),false);
+  await receive({type:'view-ready',session:3,epoch:1,generation:4}); assert.equal(engine.sceneReady(3,1),false);
+  await receive({type:'view-ready',session:3,epoch:1,generation:5}); assert.equal(engine.sceneReady(3,1),true);
+  await receive({type:'peer',connected:false}); assert.equal(shell.active,false); assert.equal(engine.state.lost,true);
+  assert.equal(typeof engine.canResume(),'string'); assert.equal(f.elements.get('coop_restart').hidden,false);
 });
