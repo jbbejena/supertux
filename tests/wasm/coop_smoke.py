@@ -373,7 +373,8 @@ async def run(args, url):
             await script('Level.finish(true);',paused=False)
             await host.wait_for_timeout(1800)
         if guest:
-            await host.locator('#coop_restart').click()
+            async with host.expect_navigation(wait_until='domcontentloaded'):
+                await host.locator('#coop_restart').click()
             await host.wait_for_function('Module.supertuxReady',timeout=180000)
             await host.locator('#start_button').click()
             await host.wait_for_function("document.querySelector('#output').textContent.includes('Setting status: In main menu')")

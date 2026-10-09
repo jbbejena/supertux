@@ -159,3 +159,15 @@ test('ordinary browser pause sends neutral status immediately and invalidates th
   await receive({type:'view-ready',session:3,epoch:1,generation:10});assert.equal(engine.sceneReady(3,1),false);
   await receive({type:'view-ready',session:3,epoch:1,generation:11});assert.equal(engine.sceneReady(3,1),true);
 });
+
+test('permanent-loss title restart waits for the save flush before navigating', async () => {
+  const f=fixture(false,async()=>({ok:true,json:async()=>({room:'a'.repeat(32),guest:'b'.repeat(64),host:'d'.repeat(64),build:'c'.repeat(64)})}));
+  await f.elements.get('coop_create').fire('click');const socket=f.sockets[0],engine=f.window.Module.supertuxCoop;
+  const receive=value=>socket.fire('message',{data:JSON.stringify(value)});
+  await receive({type:'ready'});await receive({type:'peer',connected:true});engine.engineStatus(1,true,1,0);
+  await receive({type:'peer',connected:false});
+  let flushed,reloads=0;f.window.supertux_saveFiles=()=>new Promise(resolve=>flushed=resolve);
+  f.window.location.reload=()=>++reloads;
+  const restart=f.elements.get('coop_restart').fire('click');assert.equal(reloads,0);
+  flushed(true);await restart;assert.equal(reloads,1);
+});
