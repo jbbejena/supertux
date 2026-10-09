@@ -363,16 +363,25 @@ async def run(args, url):
         if guest:
             await p2('right',True);await sample('before-disconnect',lambda s:s[1]['right'])
             await guest.evaluate("supertuxGuest.connection.close('Acceptance test disconnect')")
-            await host.wait_for_function('Module.supertuxCoop.state.reserved===-1')
-            await sample('disconnect-neutral',lambda s:not s[1]['right'])
+            await host.wait_for_function('Module.supertuxCoop.state.reserved===-1 && !Module.supertuxCoop.state.enabled && !Module.supertuxShell.active')
+            assert await host.evaluate('Module.supertuxCoop.state.sequence')==0
             await guest.locator('#guest_join').click()
             await host.wait_for_function('Module.supertuxCoop.state.joinRejected')
             assert not await guest.evaluate('supertuxGuest.state.enabled')
-            report['checks'].append('Held-button socket disconnect clears P2; in-level rejoin is rejected instead of reclaiming a live player')
-        await script('Level.finish(true);',paused=False)
-        await host.wait_for_timeout(1800)
+            report['checks'].append('Held-button disconnect neutralizes P2 and pauses simulation; in-level rejoin is rejected instead of reclaiming a live player')
+        else:
+            await script('Level.finish(true);',paused=False)
+            await host.wait_for_timeout(1800)
         if guest:
-            await guest.locator('#guest_join').click()
+            await host.locator('#coop_restart').click()
+            await host.wait_for_function('Module.supertuxReady',timeout=180000)
+            await host.locator('#start_button').click()
+            await host.wait_for_function("document.querySelector('#output').textContent.includes('Setting status: In main menu')")
+            await host.locator('#coop_panel').evaluate('(e)=>e.open=true')
+            await host.locator('#coop_create').click()
+            await host.wait_for_function("document.querySelector('#coop_status').textContent.includes('Room ready')")
+            await guest.goto(await host.locator('#coop_link').get_attribute('href'))
+            await guest.wait_for_function('supertuxGuest.state.connected')
             await host.wait_for_function('Module.supertuxCoop.state.reserved===1')
             await host.locator('#coop_panel').evaluate('(e)=>e.open=true')
             await host.locator('#coop_antarctica').click()
@@ -384,10 +393,8 @@ async def run(args, url):
             await p2('right',False);await p2('right',True)
             await sample('rejoin-fresh-input',lambda s:s[1]['right'] and not s[0]['right'])
             await guest.evaluate("Object.defineProperty(document,'hidden',{configurable:true,get:()=>true});document.dispatchEvent(new Event('visibilitychange'))")
-            await host.wait_for_function('Module.supertuxCoop.state.reserved===-1')
-            await sample('guest-background-neutral',lambda s:not s[1]['right'])
-            await script('Level.finish(true);',paused=False);await host.wait_for_timeout(1600)
-            report['checks'].append('Return to title, explicit rejoin and new level accept fresh P2 input; guest background closes socket and neutralizes held input')
+            await host.wait_for_function('Module.supertuxCoop.state.reserved===-1 && !Module.supertuxShell.active && !Module.supertuxCoop.state.enabled')
+            report['checks'].append('Return to title preserves saves; a new invitation and level accept fresh P2 input; guest background closes its socket and pauses the host')
 
         # Verify the existing persistence path for both ordinary local co-op
         # and transient remote membership, including a real page reload.

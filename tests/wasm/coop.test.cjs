@@ -26,7 +26,7 @@ function fixture(guest = false, fetch = async () => {throw Error('Unexpected fet
       hash: '#'+new URLSearchParams({room:'a'.repeat(32),token:'b'.repeat(64),build:'c'.repeat(64)}).toString()},
     SUPERTUX_DEPLOY_CONFIG: {manifestSha256: 'c'.repeat(64)},
     setInterval: () => 1, clearInterval: () => {}, setTimeout, clearTimeout});
-  if (!guest) window.Module = {supertuxReady: true, supertuxShell: {active: true, pause(reason) {this.active = false; this.reason = reason;}}};
+  if (!guest) window.Module = {supertuxReady: true, supertuxShell: {active: true, resetInput() {}, pause(reason) {this.active = false; this.reason = reason;}}};
   window.window = window;
   vm.runInNewContext(source, window);
   return {window, document, elements, sockets};
@@ -103,7 +103,7 @@ test('native frame stall pauses before input consumption; recovery needs a fresh
   await receive({type:'ready'}); await receive({type:'peer',connected:true,view:true}); engine.poll();
   engine.engineStatus(1,true,4,0);
   await receive({type:'input',generation:4,sequence:1,mask:2});
-  engine.beforeFrame(1600);
+  engine.beforeFrame(2600);
   assert.equal(shell.active,false); assert.deepEqual(Array.from(engine.poll()),[4,0,0,0]); assert.equal(engine.poll(),undefined);
   await receive({type:'input',generation:4,sequence:2,mask:2}); assert.equal(engine.poll(),undefined);
   await receive({type:'connection',interrupted:true}); assert.equal(typeof engine.canResume(),'string');
@@ -114,4 +114,31 @@ test('native frame stall pauses before input consumption; recovery needs a fresh
   await receive({type:'view-ready',session:3,epoch:1,generation:5}); assert.equal(engine.sceneReady(3,1),true);
   await receive({type:'peer',connected:false}); assert.equal(shell.active,false); assert.equal(engine.state.lost,true);
   assert.equal(typeof engine.canResume(),'string'); assert.equal(f.elements.get('coop_restart').hidden,false);
+});
+
+test('guest heartbeat interruption discards held keys and cannot be bypassed by delayed enabled status', async () => {
+  const f=fixture(true,async()=>({text:async()=>'<script>window.SUPERTUX_DEPLOY_CONFIG = '+JSON.stringify({manifestSha256:'c'.repeat(64)})+';</script>'}));
+  await new Promise(resolve=>setImmediate(resolve));
+  const socket=f.sockets[0], receive=value=>socket.fire('message',{data:JSON.stringify(value)});
+  await receive({type:'ready'});await receive({type:'session',generation:2,enabled:true});
+  await f.window.fire('keydown',{code:'ArrowRight',preventDefault(){},repeat:false});assert.equal(f.window.supertuxGuest.state.mask,2);
+  await receive({type:'connection',interrupted:true});assert.equal(f.window.supertuxGuest.state.mask,0);
+  await receive({type:'session',generation:2,enabled:true});assert.equal(f.window.supertuxGuest.state.enabled,false);
+  await receive({type:'session',generation:3,enabled:false});await receive({type:'connection',interrupted:false});
+  assert.equal(f.window.supertuxGuest.state.enabled,false);
+  await receive({type:'session',generation:4,enabled:true});assert.equal(socket.sent.at(-1).mask,0);
+});
+
+test('short native hitch retires delayed edges at the input watchdog without forcing a shared pause', async () => {
+  const f=fixture(false,async()=>({ok:true,json:async()=>({room:'a'.repeat(32),guest:'b'.repeat(64),host:'d'.repeat(64),build:'c'.repeat(64)})}));
+  await f.elements.get('coop_create').fire('click');const socket=f.sockets[0], engine=f.window.Module.supertuxCoop;
+  const receive=value=>socket.fire('message',{data:JSON.stringify(value)});
+  await receive({type:'ready'});await receive({type:'peer',connected:true});engine.poll();
+  engine.engineStatus(1,true,8,0);engine.beforeFrame(900);
+  assert.equal(f.window.Module.supertuxShell.active,true);
+  assert.deepEqual(Array.from(engine.poll()),[4,0,0,0]);
+  await receive({type:'input',generation:8,sequence:1,mask:2});assert.equal(engine.poll(),undefined);
+  engine.engineStatus(1,true,9,0);
+  await receive({type:'input',generation:8,sequence:2,mask:2});assert.equal(engine.poll(),undefined);
+  await receive({type:'input',generation:9,sequence:1,mask:0});assert.deepEqual(Array.from(engine.poll()),[2,9,1,0]);
 });

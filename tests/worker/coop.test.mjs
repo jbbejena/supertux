@@ -203,6 +203,18 @@ test('missed active heartbeat blocks delayed input until a fresh neutral generat
   await send(f.object,host,{type:'ping'}); assert.ok(host.closed); assert.equal(f.state.storage.room,null);
 });
 
+test('coalesced recovery status cannot replay an old recovered notification after a newer interruption', async () => {
+  const f=fixture(), host=f.add('host'), guest=f.add('guest');await ready(f,host);await ready(f,guest);
+  guest.info.inFlight=32;
+  f.object.send(guest,{type:'connection',interrupted:true});
+  f.object.send(guest,{type:'connection',interrupted:false});
+  f.object.send(guest,{type:'connection',interrupted:true});
+  assert.deepEqual(Object.keys(guest.info.pending),['connection']);
+  await send(f.object,guest,{type:'seen'});
+  assert.deepEqual(guest.messages.at(-1),{type:'connection',interrupted:true});
+  assert.equal(guest.info.inFlight,32);
+});
+
 test('unsolicited receive credits cannot bypass rate or backpressure limits', async () => {
   const f=fixture(), host=f.add('host');await ready(f,host);
   await send(f.object,host,{type:'seen'});assert.equal(host.info.inFlight,0);

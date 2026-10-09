@@ -46,12 +46,13 @@
 
   function host(module) {
     const queue = [], status = document.getElementById('coop_status');
-    let relayInterrupted = false, lost = false, lastFrame = performance.now();
+    let relayInterrupted = false, lost = false, recoveryPaused = false, retiredGeneration = null, lastStall = 0, lastFrame = performance.now();
     let sceneDeadline = 0, sceneKey = null, sceneLoaded = null, connection, creating = false, createEpoch = 0, joinRejected = false, guestView = false, lastView = 0, state = {reserved: 0, enabled: false, generation: 0, sequence: 0}, lastSent = '';
     const say = text => { if (status) status.textContent = text; };
     const interrupt = (reason, permanent = false) => {
       if (state.reserved !== 1) return;
       lost ||= permanent;
+      recoveryPaused = true;
       queue.length = 0;
       sceneLoaded = null;
       sceneDeadline = 0;
@@ -60,6 +61,12 @@
       const restart = document.getElementById('coop_restart');
       if (restart) restart.hidden = !lost;
       say(reason);
+    };
+    const retireInput = () => {
+      if (retiredGeneration !== null) return;
+      retiredGeneration = state.generation;
+      module.supertuxShell?.resetInput();
+      enqueue([4, 0, 0, 0]);
     };
     const enqueue = value => {
       if (value[0] !== 2) queue.length = 0;
@@ -75,7 +82,10 @@
       enqueue, poll: () => queue.shift(),
       beforeFrame(gap) {
         lastFrame = performance.now();
-        if (gap > 1500 && state.enabled && module.supertuxShell?.active) interrupt('The host stopped updating. Controls were released. Press Resume when both players are ready.');
+        if (state.enabled && module.supertuxShell?.active) {
+          if (gap >= 2500) {lastStall = gap; interrupt('The host stopped updating. Controls were released. Press Resume when both players are ready.');}
+          else if (gap >= 750) retireInput();
+        }
       },
       canResume() {
         if (lost) return 'Player 2 disconnected. Return to the title screen and create a new room.';
@@ -84,15 +94,17 @@
       },
       engineStatus(reserved, enabled, generation, sequence) {
         state = {reserved, enabled: !!enabled, generation, sequence};
+        if (generation !== retiredGeneration) retiredGeneration = null;
+        if (enabled && module.supertuxShell?.active) recoveryPaused = false;
         const key = `${reserved}/${enabled}/${generation}`;
         if (key !== lastSent) { lastSent = key; session(); }
         if (reserved === 1) joinRejected = false;
         if (reserved === -2) joinRejected = true;
-        if (connection?.ready && reserved === 1 && !relayInterrupted && !lost) say(enabled ? 'Player 2 input active. Host owns the game and saves.' : 'Player 2 joined. Input waits while the host is in menus or paused.');
+        if (connection?.ready && reserved === 1 && !relayInterrupted && !lost && !recoveryPaused) say(enabled ? 'Player 2 input active. Host owns the game and saves.' : 'Player 2 joined. Input waits while the host is in menus or paused.');
         if (connection?.ready && reserved === -1 && !joinRejected) say('Player 2 disconnected. Return to the title screen, rejoin, then start a level.');
         if (connection?.ready && joinRejected) say('Join requires one local player at the title screen. Return there and rejoin before starting a level; reload if local Player 2 was already configured.');
       },
-      get state() { return {...state, queued: queue.length, joinRejected, relayInterrupted, lost}; },
+      get state() { return {...state, queued: queue.length, joinRejected, relayInterrupted, lost, recoveryPaused, lastStall}; },
       get connection() { return connection; },
       wantsView() {return !!(connection?.ready && guestView && state.reserved === 1 && state.generation && Date.now() - lastView >= 100);},
       sceneReady(session, epoch) {
@@ -119,7 +131,7 @@
     document.getElementById('coop_create')?.addEventListener('click', async () => {
       if (creating || !module.supertuxReady) return;
       const epoch = ++createEpoch;
-      creating = true; sceneDeadline=0;sceneKey = sceneLoaded = null; joinRejected = false; connection?.close(); relayInterrupted = lost = false; enqueue([3, 0, 0, 0]);
+      creating = true; sceneDeadline=0;sceneKey = sceneLoaded = null; joinRejected = false; connection?.close(); relayInterrupted = lost = recoveryPaused = false; retiredGeneration = null; enqueue([3, 0, 0, 0]);
       try {
         const build = window.SUPERTUX_DEPLOY_CONFIG?.manifestSha256;
         const response = await fetch('/coop/rooms', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({protocol, build}), signal: AbortSignal.timeout(10000)});
@@ -142,8 +154,12 @@
             }
             if (value.type === 'view-ready' && value.generation === state.generation && `${value.session}/${value.epoch}` === sceneKey) sceneLoaded = sceneKey;
             if (value.type === 'input') {
-              if (performance.now() - lastFrame > 1500 && state.enabled && module.supertuxShell?.active) interrupt('The host stopped updating. Controls were released. Press Resume when both players are ready.');
-              if (!relayInterrupted && !lost && module.supertuxShell?.active && state.enabled && value.generation === state.generation) enqueue([2, value.generation, value.sequence, value.mask]);
+              const gap = performance.now() - lastFrame;
+              if (state.enabled && module.supertuxShell?.active) {
+                if (gap >= 2500) {lastStall = gap; interrupt('The host stopped updating. Controls were released. Press Resume when both players are ready.');}
+                else if (gap >= 750) retireInput();
+              }
+              if (retiredGeneration === null && !relayInterrupted && !lost && module.supertuxShell?.active && state.enabled && value.generation === state.generation) enqueue([2, value.generation, value.sequence, value.mask]);
             }
           },
           refresh: session,
