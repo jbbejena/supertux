@@ -44,6 +44,9 @@ still ends its socket rather than silently accepting input from a hidden page.
 Opening a new invitation in the same guest tab clears controls, closes the old
 room and reloads the new credentials. Fragment-only navigation previously kept
 the old client's room identity and could prevent joining after a title restart.
+The co-op panel shares the game overlay's stacking context, so an expanded panel
+cannot cover Resume or Return to title while paused. The restart button uses the
+same minimum 44-pixel target as the other activation controls.
 
 ## Bounds and scope
 

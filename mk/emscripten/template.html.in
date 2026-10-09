@@ -195,7 +195,7 @@
     #activation_panel { max-width: 94%; max-height: 100%; overflow: auto; text-align: center; }
     #status { margin: 12px; overflow-wrap: anywhere; }
     #progress { max-width: 80%; margin: 0 auto; }
-    #start_button, #play_muted, #fullscreen_button {
+    #start_button, #play_muted, #coop_restart, #fullscreen_button {
       min-height: 44px; margin: 8px; padding: 10px 20px;
       color: white; background: #285484; border: 2px solid #b8d8ff;
       border-radius: 8px; font: bold 1rem arial; cursor: pointer; touch-action: manipulation;
@@ -216,7 +216,9 @@
 </head>
 
 <body>
-  <details id="coop_panel" hidden style="position:relative;z-index:6;background:#142333;color:white;padding:8px">
+  <main id="game_shell" aria-label="SuperTux game">
+  <div id="game_area">
+  <details id="coop_panel" hidden style="position:absolute;top:0;left:0;right:0;z-index:6;background:#142333;color:white;padding:8px">
     <summary>Private co-op — one playable level</summary>
     <p>Invite Player 2 at the title screen. Shared view supports Welcome to Antarctica and the display test arena. The host controls menus and saves.</p>
     <button id="coop_create" type="button">Create private input room</button>
@@ -229,8 +231,6 @@
     <a id="coop_link" style="overflow-wrap:anywhere;color:#a5c7ed" target="_blank" rel="noreferrer"></a>
     <p>Guest shared view: <a id="coop_view_link" style="overflow-wrap:anywhere;color:#a5c7ed" target="_blank" rel="noreferrer"></a></p>
   </details>
-  <main id="game_shell" aria-label="SuperTux game">
-  <div id="game_area">
   <div id="overlay" class="center_stuff">
     <div id="activation_panel">
       <div class="spinner" id="spinner"></div>
