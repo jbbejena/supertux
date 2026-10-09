@@ -218,7 +218,7 @@
 <body>
   <main id="game_shell" aria-label="SuperTux game">
   <div id="game_area">
-  <details id="coop_panel" hidden style="position:absolute;top:0;left:0;right:0;z-index:6;background:#142333;color:white;padding:8px">
+  <details id="coop_panel" hidden style="position:absolute;top:0;left:0;right:0;max-height:100%;overflow:auto;z-index:6;background:#142333;color:white;padding:8px">
     <summary>Private co-op — one playable level</summary>
     <p>Invite Player 2 at the title screen. Shared view supports Welcome to Antarctica and the display test arena. The host controls menus and saves.</p>
     <button id="coop_create" type="button">Create private input room</button>
