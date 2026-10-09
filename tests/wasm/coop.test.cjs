@@ -114,6 +114,8 @@ test('native frame stall pauses before input consumption; recovery needs a fresh
   await receive({type:'view-ready',session:3,epoch:1,generation:5}); assert.equal(engine.sceneReady(3,1),true);
   await receive({type:'peer',connected:false}); assert.equal(shell.active,false); assert.equal(engine.state.lost,true);
   assert.equal(typeof engine.canResume(),'string'); assert.equal(f.elements.get('coop_restart').hidden,false);
+  await f.elements.get('coop_create').fire('click');assert.equal(f.sockets.length,1);
+  assert.equal(engine.state.lost,true);assert.equal(f.elements.get('coop_restart').hidden,false);
 });
 
 test('guest heartbeat interruption discards held keys and cannot be bypassed by delayed enabled status', async () => {
@@ -141,4 +143,19 @@ test('short native hitch retires delayed edges at the input watchdog without for
   engine.engineStatus(1,true,9,0);
   await receive({type:'input',generation:8,sequence:2,mask:2});assert.equal(engine.poll(),undefined);
   await receive({type:'input',generation:9,sequence:1,mask:0});assert.deepEqual(Array.from(engine.poll()),[2,9,1,0]);
+});
+
+test('ordinary browser pause sends neutral status immediately and invalidates the previous scene acknowledgment', async () => {
+  const f=fixture(false,async()=>({ok:true,json:async()=>({room:'a'.repeat(32),guest:'b'.repeat(64),host:'d'.repeat(64),build:'c'.repeat(64)})}));
+  await f.elements.get('coop_create').fire('click');const socket=f.sockets[0], engine=f.window.Module.supertuxCoop;
+  const receive=value=>socket.fire('message',{data:JSON.stringify(value)});
+  await receive({type:'ready'});await receive({type:'peer',connected:true,view:true});
+  engine.engineStatus(1,true,10,0);assert.equal(engine.sceneReady(3,1),false);
+  await receive({type:'view-ready',session:3,epoch:1,generation:10});assert.equal(engine.sceneReady(3,1),true);
+  f.window.Module.supertuxShell.active=false;engine.onPause();
+  assert.equal(socket.sent.filter(v=>v.type==='session').at(-1).enabled,false);
+  assert.equal(engine.sceneReady(3,1),false);
+  f.window.Module.supertuxShell.active=true;engine.engineStatus(1,false,11,0);
+  await receive({type:'view-ready',session:3,epoch:1,generation:10});assert.equal(engine.sceneReady(3,1),false);
+  await receive({type:'view-ready',session:3,epoch:1,generation:11});assert.equal(engine.sceneReady(3,1),true);
 });

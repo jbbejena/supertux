@@ -844,7 +844,11 @@ void ScreenManager::loop_iter()
     g_game_time += dtime;
     process_events();
 #ifdef __EMSCRIPTEN__
-    if (m_browser_suspended) {elapsed_time = 0.0f; return;}
+    if (m_browser_suspended)
+    {
+      elapsed_time = 0.0f;
+      return;
+    }
 #endif
     update_gamelogic(dtime);
     elapsed_time -= seconds_per_step;

@@ -76,7 +76,9 @@ test('co-op recovery gate keeps trusted Resume covered until the relay is neutra
   // The production co-op object is installed on Module after shell creation.
   r.ids.canvas.focus = () => {throw Error('A blocked Resume must not activate audio or input');};
   // Supply the gate through the same Module used by the real embedding.
-  r.module.supertuxCoop={canResume:()=> 'Waiting for the connection to recover.'};
+  let paused=0;
+  r.module.supertuxCoop={canResume:()=> 'Waiting for the connection to recover.',onPause:()=>++paused};
+  r.shell.pause('Connection interrupted');assert.equal(paused,1);
   r.start(); assert.equal(r.shell.active,false);
   assert.equal(r.ids.status.textContent,'Waiting for the connection to recover.');
   assert.equal(r.ids.overlay.style.display,'flex');

@@ -353,7 +353,8 @@ async def measure_trial(args,url,index,html,hc,gc,version):
                     settled:window.benchmarkSettled,measurements:window.coopBenchmark?.data,
                     host_intervals:window.hostBenchmark && {
                       raf_max_ms:Math.max(0,...hostBenchmark.intervals),
-                      native_max_ms:Math.max(0,...hostBenchmark.nativeIntervals)}};
+                      native_max_ms:Math.max(0,...hostBenchmark.nativeIntervals),
+                      long_tasks:hostBenchmark.longTasks}};
                 }''')
                 await page.screenshot(path=str(args.output/f'run-{index+1}-{role}-failure.png'))
             except Exception as diagnostic_error:
@@ -377,6 +378,7 @@ async def run(args, url):
         profile=dict(name=args.profile,**PROFILES[args.profile],scope='ordered local WebSocket byte stream; HTTP assets unshaped'),
         conditions=dict(viewport=dict(width=844,height=390),device_scale_factor=1,has_touch=True,
           separate_browser_processes=True, fresh_profiles_per_run=True,
+          host_cpu_profiling=args.profile_host,
           browser_profile='ephemeral contexts' if args.ephemeral else 'persistent temporary profiles',
           host_http_cache='disabled by developer HTML route; warm persistent asset store retained',
           guest_http_cache='enabled, cold fresh context then warm page in same context',

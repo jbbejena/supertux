@@ -70,6 +70,7 @@
     clearTimeout(audioTimer);
     if (ready && !failed) {
       call('set_browser_suspended', ['number'], [1]);
+      Module.supertuxCoop?.onPause?.();
       prompt(message);
     }
     suspendAudio();

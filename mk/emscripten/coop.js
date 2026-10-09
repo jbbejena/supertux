@@ -75,11 +75,16 @@
     };
     const session = () => {
       if (!connection?.ready || !state.generation) return;
-      connection.send({type: 'session', generation: state.generation, enabled: state.enabled});
+      connection.send({type: 'session', generation: state.generation, enabled: state.enabled && !!module.supertuxShell?.active});
       connection.send({type: 'ack', sequence: state.sequence});
     };
     module.supertuxCoop = {
       enqueue, poll: () => queue.shift(),
+      onPause() {
+        sceneLoaded = null; sceneDeadline = 0;
+        enqueue([4, 0, 0, 0]);
+        session();
+      },
       beforeFrame(gap) {
         lastFrame = performance.now();
         if (state.enabled && module.supertuxShell?.active) {
@@ -130,8 +135,11 @@
     if (panel) panel.hidden = !new URLSearchParams(location.search).has('coop');
     document.getElementById('coop_create')?.addEventListener('click', async () => {
       if (creating || !module.supertuxReady) return;
+      if (lost || state.reserved === 1) {say('Close the current room and return to the title screen before creating a new invitation.');return;}
       const epoch = ++createEpoch;
       creating = true; sceneDeadline=0;sceneKey = sceneLoaded = null; joinRejected = false; connection?.close(); relayInterrupted = lost = recoveryPaused = false; retiredGeneration = null; enqueue([3, 0, 0, 0]);
+      const restart = document.getElementById('coop_restart');
+      if (restart) restart.hidden = true;
       try {
         const build = window.SUPERTUX_DEPLOY_CONFIG?.manifestSha256;
         const response = await fetch('/coop/rooms', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({protocol, build}), signal: AbortSignal.timeout(10000)});
