@@ -225,8 +225,27 @@ test('permanent-loss title restart waits for the save flush before navigating', 
   const receive=value=>socket.fire('message',{data:JSON.stringify(value)});
   await receive({type:'ready'});await receive({type:'peer',connected:true});engine.engineStatus(1,true,1,0);
   await receive({type:'peer',connected:false});
-  let flushed,reloads=0;f.window.supertux_saveFiles=()=>new Promise(resolve=>flushed=resolve);
+  let flushed,reloads=0,saves=0;f.window.supertux_saveFiles=()=>{++saves;return new Promise(resolve=>flushed=resolve);};
   f.window.location.reload=()=>++reloads;
   const restart=f.elements.get('coop_restart').fire('click');assert.equal(reloads,0);
+  const repeated=f.elements.get('coop_restart').fire('click');assert.equal(saves,1,'Repeated taps cannot start overlapping title restarts');await repeated;
   flushed(true);await restart;assert.equal(reloads,1);
+});
+
+test('failed or unavailable saves keep the lost game open; retry can safely return to title', async () => {
+  for (const save of [async()=>false,async()=>{throw Error('Storage unavailable');},undefined]) {
+    const f=fixture(false,async()=>({ok:true,json:async()=>({room:'a'.repeat(32),guest:'b'.repeat(64),host:'d'.repeat(64),build:'c'.repeat(64)})}));
+    await f.elements.get('coop_create').fire('click');const socket=f.sockets[0],engine=f.window.Module.supertuxCoop;
+    const receive=value=>socket.fire('message',{data:JSON.stringify(value)});
+    await receive({type:'ready'});await receive({type:'peer',connected:true});engine.engineStatus(1,true,1,0);
+    await receive({type:'peer',connected:false});
+    let reloads=0;f.window.location.reload=()=>++reloads;f.window.supertux_saveFiles=save;
+    await f.elements.get('coop_restart').fire('click');
+    assert.equal(reloads,0,'A failed flush must not discard unsaved progress');
+    assert.equal(f.window.Module.supertuxShell.active,false);assert.equal(typeof engine.canResume(),'string');
+    assert.match(f.window.Module.supertuxShell.reason,/could not be saved.*retry/i);
+    assert.equal(f.elements.get('coop_restart').disabled,false);
+    f.window.supertux_saveFiles=async()=>true;
+    await f.elements.get('coop_restart').fire('click');assert.equal(reloads,1);
+  }
 });

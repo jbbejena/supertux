@@ -422,6 +422,31 @@ async def run(args, url):
         assert not await host.evaluate('Module.supertuxShell.active')
         assert await host.locator('#coop_restart').is_visible()
         report['checks'].append('Guest background/disconnect clears controls and image history, pauses the host and blocks Resume; the title-screen restart action is visible')
+        # The storage API resolves false on quota/unavailable storage. Do not
+        # mistake that completed attempt for a durable save and reload the page.
+        saved_config=await host.evaluate('''() => {
+          const fs=Module.FS,root=Module.supertuxStorage.root;
+          fs.writeFile(root+'recovery-progress-fixture.txt','private-coop-progress');
+          window.recoveryRestartMarker=true;
+          window.recoverySave=window.supertux_saveFiles;
+          window.supertux_saveFiles=async()=>false;
+          return fs.readFile(root+'config',{encoding:'utf8'});
+        }''')
+        await host.locator('#coop_restart').click()
+        await host.wait_for_function("document.querySelector('#status').textContent.includes('could not be saved')")
+        assert await host.evaluate('Module.supertuxCoop.state.lost && !Module.supertuxShell.active')
+        assert not await host.locator('#coop_restart').is_disabled()
+        await host.evaluate('window.supertux_saveFiles=window.recoverySave')
+        await host.locator('#coop_restart').click()
+        await host.wait_for_function('!window.recoveryRestartMarker && window.Module?.supertuxReady && Module.supertuxStorage.state === "indexeddb"',timeout=180000)
+        preserved=await host.evaluate('''() => {
+          const fs=Module.FS,root=Module.supertuxStorage.root;
+          return {progress:fs.readFile(root+'recovery-progress-fixture.txt',{encoding:'utf8'}),
+                  config:fs.readFile(root+'config',{encoding:'utf8'})};
+        }''')
+        assert preserved['progress']=='private-coop-progress'
+        assert preserved['config']==saved_config
+        report['checks'].append('Failed save keeps the host paused without reloading; retry durably flushes settings/progression fixture bytes and hydrates them after title restart')
         for line in logs:
             if re.search(r'undefined symbol|Aborted\(|\[FATAL\]|runtime error:|missing function|AN ERROR HAS OCCURRED|Error waking VM|Squirrel exception:|Shared view artwork missing:|Co-op presentation rejected|Co-op presentation exceeded',line):
                 if not (args.record_known_ub and any(re.search(pattern,line) for pattern in KNOWN_UPSTREAM_UB)):errors.append(line)

@@ -193,9 +193,20 @@
     });
     document.getElementById('coop_close')?.addEventListener('click', () => {++createEpoch; connection?.close();});
     document.getElementById('coop_restart')?.addEventListener('click', async () => {
-      if (!lost) return;
-      await window.supertux_saveFiles?.();
-      location.reload();
+      const restart = document.getElementById('coop_restart');
+      if (!lost || restart?.disabled) return;
+      if (restart) restart.disabled = true;
+      try {
+        const saved = await window.supertux_saveFiles?.();
+        if (saved !== true) throw Error('Save did not complete');
+        location.reload();
+      } catch {
+        const message = 'Progress could not be saved. Keep this page open and retry Return to title.';
+        module.supertuxShell?.pause(message);
+        say(message);
+      } finally {
+        if (restart) restart.disabled = false;
+      }
     });
     document.getElementById('coop_antarctica')?.addEventListener('click', () => {
       if (guestView && state.reserved !== 1) say('Invite Player 2 before starting.');
