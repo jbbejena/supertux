@@ -64,6 +64,31 @@ async def run(args, url):
         await host.evaluate("window.dispatchEvent(new Event('focus'))")
         report['checks'].append('Blur between guest notification and native polling preserves the remote ownership command while retiring input; trusted Resume keeps Player 2 joined')
         await host.evaluate('''() => {
+          window.viewLifecycle=[];
+          const record=(type,detail)=>{
+            viewLifecycle.push({type,at:performance.now(),detail});
+            if(viewLifecycle.length>64)viewLifecycle.shift();
+          };
+          const connection=Module.supertuxCoop.connection,message=connection.events.message;
+          connection.events.message=value=>{
+            if(value.type==='connection')record('relay',value);
+            message(value);
+          };
+          const before=Module.supertuxCoop.beforeFrame;
+          Module.supertuxCoop.beforeFrame=gap=>{
+            if(gap>=750)record('native-gap',{gap,state:Module.supertuxCoop.state});
+            before(gap);
+          };
+          const pause=Module.supertuxShell.pause;
+          Module.supertuxShell.pause=reason=>{
+            record('shared-pause',{reason,state:Module.supertuxCoop.state});
+            pause(reason);
+          };
+          if(PerformanceObserver.supportedEntryTypes.includes('longtask'))
+            new PerformanceObserver(list=>{
+              for(const entry of list.getEntries())if(entry.duration>=500)
+                record('long-task',{start:entry.startTime,duration:entry.duration});
+            }).observe({type:'longtask'});
           window.lastViewPacket=null;const publish=Module.supertuxCoop.view;
           Module.supertuxCoop.view=frame=>{lastViewPacket=frame;publish(frame);};
           window.viewInputFrames=0;const status=Module.supertuxCoop.engineStatus;
@@ -178,6 +203,8 @@ async def run(args, url):
                     # ignored; drive the next fixture only after presentation.
                     await guest.wait_for_function('SupertuxView.playable && supertuxGuest.state.mask===0')
                 except Exception:
+                    trace=await host.evaluate('viewLifecycle');
+                    (args.output/'script-lifecycle-failure.json').write_text(json.dumps(trace,indent=2)+'\n')
                     print('VIEW_SCRIPT_FAILED',command,await guest.evaluate('({guest:supertuxGuest.state,view:SupertuxView.state,status:document.querySelector("#guest_status").textContent,viewStatus:document.querySelector("#view_status").textContent})'),await host.evaluate('({state:Module.supertuxCoop.state,status:document.querySelector("#coop_status").textContent,packet:window.lastViewPacket})'),flush=True)
                     await host.locator('#canvas').screenshot(path=str(args.output/'script-host-failure.png'))
                     await guest.screenshot(path=str(args.output/'script-guest-failure.png'))
