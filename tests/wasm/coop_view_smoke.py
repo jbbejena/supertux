@@ -22,6 +22,10 @@ async def run(args, url):
     html = urlopen(request, timeout=30).read().decode().replace('var Module = {','var Module = {\narguments:["--verbose","--developer"],',1)
     async with async_playwright() as p:
         launch = dict(args=['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader']) if args.browser=='chromium' else {}
+        if args.browser == 'chromium' and not args.gpu_compositing:
+            # Preserve real SDL/WebGL rendering while avoiding software-GPU
+            # compositor contention between the independent host/guest browsers.
+            launch['args'].append('--disable-gpu-compositing')
         if args.webkit_executable: launch['executable_path']=args.webkit_executable
         host_browser=await getattr(p,args.browser).launch(**launch)
         guest_browser=await getattr(p,args.browser).launch(**launch)

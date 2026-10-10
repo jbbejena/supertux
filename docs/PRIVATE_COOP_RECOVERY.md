@@ -256,6 +256,13 @@ long tasks. Failed console fixtures preserve the trace and current shell/input
 states, including failures before the command executes. No unexpected pause is
 automatically resumed to make a test pass.
 
+The later [Chromium rendering investigation](CHROMIUM_RENDERING_INVESTIGATION.md)
+captured software-GPU command-buffer backpressure during EGL context switching.
+The two-browser Chromium launchers now use software page compositing while
+preserving SDL/WebGL rendering; `--gpu-compositing` reproduces the original mode.
+The historical failures below precede this test adjustment. Physical-phone and
+hosted acceptance remain separate from local headless results.
+
 The first validated and published recovery runtime is
 `7c7926478e40f24cf6bca972609f1a86ee5d1de4`, using
 Emscripten 6.0.11 and pinned vcpkg

@@ -1,0 +1,451 @@
+{
+  "date_utc": "2026-10-10",
+  "runtime_commit": "52d8bf370bee4b97b1a943beec695274fb13b518",
+  "release_build": {
+    "configuration": "Release",
+    "inventorySha256": "7baa87e03cdfc5eed8fdf54161234f818cdde5022620a10cf59f6227b94fadb9",
+    "mode": "deferred-music",
+    "sourceCommit": "52d8bf370bee4b97b1a943beec695274fb13b518",
+    "toolchain": "emscripten-6.0.11"
+  },
+  "browser": "151.0.7922.34",
+  "conditions": {
+    "viewport": [
+      844,
+      390
+    ],
+    "dpr": 1,
+    "touch_available": true,
+    "desktop_identity": true,
+    "physical_device_tested": false,
+    "http_throttled": false,
+    "websocket_throttled": false,
+    "fresh_context_per_trial": true,
+    "two_independent_browsers": true,
+    "cpu_quota_cores": 4,
+    "sequential_workloads": true,
+    "light_probe_profiler_enabled": false,
+    "light_probe_tracing_enabled": false,
+    "light_probe_screenshots_during_measurement": false,
+    "light_probe_deliberate_stall": false
+  },
+  "root_cause_evidence": {
+    "frame_gap_ms": 2940.4,
+    "frame_calls": {
+      "bufferSubData": {
+        "count": 1,
+        "total": 0.10000002384185791,
+        "max": 0.10000002384185791
+      },
+      "clear": {
+        "count": 1,
+        "total": 0,
+        "max": 0
+      },
+      "disableVertexAttribArray": {
+        "count": 6,
+        "total": 0,
+        "max": 0
+      },
+      "useProgram": {
+        "count": 12,
+        "total": 0,
+        "max": 0
+      },
+      "vertexAttribPointer": {
+        "count": 374,
+        "total": 2635.5999999940395,
+        "max": 2635.4000000059605
+      },
+      "drawArrays": {
+        "count": 127,
+        "total": 284.09999999403954,
+        "max": 283.90000000596046
+      },
+      "enableVertexAttribArray": {
+        "count": 6,
+        "total": 0,
+        "max": 0
+      },
+      "bindTexture": {
+        "count": 120,
+        "total": 0.19999998807907104,
+        "max": 0.09999999403953552
+      }
+    },
+    "profile": {
+      "self_ms": [
+        [
+          "vertexAttribPointer",
+          2633.215000000003
+        ],
+        [
+          "drawArrays",
+          284.023
+        ],
+        [
+          "(program)",
+          8.534999999999998
+        ],
+        [
+          "send",
+          4.638
+        ],
+        [
+          "ctor.<computed>",
+          3.073
+        ],
+        [
+          "_emscripten_glBindTexture",
+          2.47
+        ],
+        [
+          "wasm-function[12819]",
+          1.16
+        ],
+        [
+          "getWasmTableEntry",
+          1.087
+        ],
+        [
+          "wasm-function[429]",
+          1.085
+        ],
+        [
+          "wasm-function[3781]",
+          1.082
+        ],
+        [
+          "stackSave",
+          1.075
+        ],
+        [
+          "wasm-function[4640]",
+          1.075
+        ]
+      ],
+      "inclusive_ms": [
+        [
+          "(root)",
+          2941.1689999999994
+        ],
+        [
+          "wasm-function[5742]",
+          2931.544
+        ],
+        [
+          "js-to-wasm:iii:",
+          2931.544
+        ],
+        [
+          "invoke_viii",
+          2931.544
+        ],
+        [
+          "wasm-to-js",
+          2930.1949999999997
+        ],
+        [
+          "wasm-function[5741]",
+          2930.1949999999997
+        ],
+        [
+          "js-to-wasm::",
+          2930.1949999999997
+        ],
+        [
+          "callUserCallback",
+          2930.1949999999997
+        ],
+        [
+          "runIter",
+          2930.1949999999997
+        ],
+        [
+          "MainLoop_runner",
+          2930.1949999999997
+        ],
+        [
+          "wasm-function[15204]",
+          2922.7810000000004
+        ],
+        [
+          "wasm-function[4634]",
+          2922.7810000000004
+        ]
+      ]
+    },
+    "trace_events": [
+      {
+        "name": "RunTask",
+        "start": 70140.66,
+        "duration": 2935.22,
+        "thread": "CrRendererMain"
+      },
+      {
+        "name": "ThreadControllerImpl::RunTask",
+        "start": 70140.66,
+        "duration": 2934.37,
+        "thread": "CrRendererMain"
+      },
+      {
+        "name": "TimerFire",
+        "start": 70140.67,
+        "duration": 2934.36,
+        "thread": "CrRendererMain"
+      },
+      {
+        "name": "FunctionCall",
+        "start": 70140.68,
+        "duration": 2934.3,
+        "thread": "CrRendererMain"
+      },
+      {
+        "name": "CommandBufferHelper::WaitForAvailableEntries1",
+        "start": 70433.21,
+        "duration": 2635.32,
+        "thread": "CrRendererMain"
+      },
+      {
+        "name": "CommandBufferProxyImpl::WaitForGetOffset",
+        "start": 70433.21,
+        "duration": 2635.22,
+        "thread": "CrRendererMain"
+      },
+      {
+        "name": "RunTask",
+        "start": 70432.55,
+        "duration": 2634.09,
+        "thread": "CrGpuMain"
+      },
+      {
+        "name": "ThreadControllerImpl::RunTask",
+        "start": 70432.55,
+        "duration": 2634.08,
+        "thread": "CrGpuMain"
+      },
+      {
+        "name": "GLContextEGL::MakeCurrent",
+        "start": 70432.56,
+        "duration": 2633.93,
+        "thread": "CrGpuMain"
+      },
+      {
+        "name": "RunTask",
+        "start": 70020.26,
+        "duration": 409.76,
+        "thread": "CrGpuMain"
+      },
+      {
+        "name": "ThreadControllerImpl::RunTask",
+        "start": 70020.26,
+        "duration": 409.75,
+        "thread": "CrGpuMain"
+      },
+      {
+        "name": "Scheduler::RunTask",
+        "start": 70020.26,
+        "duration": 409.75,
+        "thread": "CrGpuMain"
+      },
+      {
+        "name": "GLContextEGL::MakeCurrent",
+        "start": 70020.26,
+        "duration": 409.17,
+        "thread": "CrGpuMain"
+      },
+      {
+        "name": "CommandBufferHelper::WaitForAvailableEntries1",
+        "start": 70149.17,
+        "duration": 283.89,
+        "thread": "CrRendererMain"
+      },
+      {
+        "name": "CommandBufferProxyImpl::WaitForGetOffset",
+        "start": 70149.17,
+        "duration": 283.84,
+        "thread": "CrRendererMain"
+      }
+    ],
+    "throttling": {
+      "elapsed_s": 67.27938867599005,
+      "deltas": {
+        "usage_usec": 268592854,
+        "user_usec": 240899406,
+        "system_usec": 27693448,
+        "nice_usec": 0,
+        "nr_periods": 673,
+        "nr_throttled": 661,
+        "throttled_usec": 54192000,
+        "nr_bursts": 0,
+        "burst_usec": 0
+      },
+      "average_cores": 3.992201167188259,
+      "throttled_period_fraction": 0.9821693907875185,
+      "process_cpu_s": {
+        "chrome-headless": 247.52999999999963,
+        "workerd": 4.499999999999979,
+        "python": 12.160000000000016,
+        "MainThread": 3.6299999999999906,
+        "esbuild": 0.09
+      }
+    },
+    "interpretation": "Renderer waits for command-buffer space while GPU main thread waits in EGL MakeCurrent; software-renderer/compositor contention under CPU quota. Exact native EGL wait primitive not measured."
+  },
+  "trials": [
+    {
+      "case": "growth-normal-light-1",
+      "outcome": "failed",
+      "acceptance_test": false,
+      "diagnostic_draws_disabled": false,
+      "max_campaign_frame_gap_ms": 3897.5,
+      "max_tracked_webgl_call_ms": 3827.5,
+      "max_vertex_attribute_call_ms": 3827.5,
+      "measurement_seconds": 36.272578131000046,
+      "average_cpu_cores": 3.966939115282371,
+      "throttled_period_fraction": 0.9723756906077348
+    },
+    {
+      "case": "growth-normal-light-2",
+      "outcome": "passed",
+      "acceptance_test": false,
+      "diagnostic_draws_disabled": false,
+      "max_campaign_frame_gap_ms": 1367,
+      "max_tracked_webgl_call_ms": 1730.199999988079,
+      "max_vertex_attribute_call_ms": 1730.199999988079,
+      "measurement_seconds": 44.278029582987074,
+      "average_cpu_cores": 3.9916075007075045,
+      "throttled_period_fraction": 0.9887133182844243
+    },
+    {
+      "case": "growth-normal-light-3",
+      "outcome": "failed",
+      "acceptance_test": false,
+      "diagnostic_draws_disabled": false,
+      "max_campaign_frame_gap_ms": null,
+      "max_tracked_webgl_call_ms": 4169.300000011921,
+      "max_vertex_attribute_call_ms": 774.1000000238419,
+      "measurement_seconds": 99.76647974998923,
+      "average_cpu_cores": 3.89213423158836,
+      "throttled_period_fraction": 0.9268537074148296,
+      "frame_ring_overrun": true,
+      "reported_native_gap_ms": 4653.199999988079,
+      "gap_source": "script-lifecycle-failure.json host.state.lastStall; active frame already overwritten in 3000-frame ring while fixture awaited paused host",
+      "max_tracked_webgl_call_method": "bufferSubData"
+    },
+    {
+      "case": "growth-no-draw-light-1",
+      "outcome": "passed",
+      "acceptance_test": false,
+      "diagnostic_draws_disabled": true,
+      "max_campaign_frame_gap_ms": 45.1,
+      "max_tracked_webgl_call_ms": 23.19999998807907,
+      "max_vertex_attribute_call_ms": 23.19999998807907,
+      "measurement_seconds": 12.74743230000604,
+      "average_cpu_cores": 3.172458895897085,
+      "throttled_period_fraction": 0.23622047244094488
+    },
+    {
+      "case": "growth-cpu-compositor-light-1",
+      "outcome": "passed",
+      "acceptance_test": false,
+      "diagnostic_draws_disabled": false,
+      "max_campaign_frame_gap_ms": 414.6,
+      "max_tracked_webgl_call_ms": 6.799999982118607,
+      "max_vertex_attribute_call_ms": 6.799999982118607,
+      "measurement_seconds": 23.828865639981814,
+      "average_cpu_cores": 3.7467098244995656,
+      "throttled_period_fraction": 0.5504201680672269
+    },
+    {
+      "case": "growth-cpu-compositor-light-2",
+      "outcome": "passed",
+      "acceptance_test": false,
+      "diagnostic_draws_disabled": false,
+      "max_campaign_frame_gap_ms": 102.8,
+      "max_tracked_webgl_call_ms": 19.200000017881393,
+      "max_vertex_attribute_call_ms": 19.200000017881393,
+      "measurement_seconds": 22.830472451023525,
+      "average_cpu_cores": 3.77026275670178,
+      "throttled_period_fraction": 0.47368421052631576
+    },
+    {
+      "case": "growth-cpu-compositor-light-3",
+      "outcome": "passed",
+      "acceptance_test": false,
+      "diagnostic_draws_disabled": false,
+      "max_campaign_frame_gap_ms": 480.6,
+      "max_tracked_webgl_call_ms": 41.599999994039536,
+      "max_vertex_attribute_call_ms": 6,
+      "measurement_seconds": 27.597456318995683,
+      "average_cpu_cores": 3.7703579560837817,
+      "throttled_period_fraction": 0.5253623188405797
+    }
+  ],
+  "full_release": {
+    "outcome": "passed",
+    "checks": 24,
+    "errors": [],
+    "metrics": {
+      "input_to_visible_30px_ms": 325,
+      "snapshot_count": 107,
+      "snapshot_bytes_max": 481,
+      "snapshot_bytes_per_second": 4204,
+      "snapshot_hz": 9.2,
+      "interpolation_delay_ms": 90,
+      "buffer_limit": 8,
+      "campaign_selection_to_ready_ms": 804,
+      "campaign_input_to_30_world_px_ms": 491,
+      "campaign_interpolated_draws": 22,
+      "campaign_snapshot_bytes_max": 52025,
+      "campaign_snapshot_hz": 6.3,
+      "campaign_snapshot_bytes_per_second": 211196
+    },
+    "diagnostics_injected": false,
+    "launch_change_only": "--disable-gpu-compositing"
+  },
+  "full_debug": {
+    "outcome": "passed",
+    "checks": 24,
+    "errors": [],
+    "known_upstream_ub_annotations": 6,
+    "metrics": {
+      "input_to_visible_30px_ms": 401,
+      "snapshot_count": 115,
+      "snapshot_bytes_max": 480,
+      "snapshot_bytes_per_second": 3920,
+      "snapshot_hz": 8.6,
+      "interpolation_delay_ms": 90,
+      "buffer_limit": 8,
+      "campaign_selection_to_ready_ms": 4317,
+      "campaign_input_to_30_world_px_ms": 657,
+      "campaign_interpolated_draws": 19,
+      "campaign_snapshot_bytes_max": 51833,
+      "campaign_snapshot_hz": 4.9,
+      "campaign_snapshot_bytes_per_second": 167219
+    },
+    "build": {
+      "configuration": "Debug",
+      "inventorySha256": "aff13d4051196a19a5ec7392a2f9833bd334bba7657d338ec240c9c0bee84dff",
+      "mode": "deferred-music",
+      "sourceCommit": "52d8bf370bee4b97b1a943beec695274fb13b518",
+      "toolchain": "emscripten-6.0.11"
+    },
+    "diagnostics_injected": false,
+    "launch_change_only": "--disable-gpu-compositing"
+  },
+  "remote_input_release": {
+    "outcome": "passed",
+    "checks": 18,
+    "known_upstream_ub_annotations": 0,
+    "diagnostics_injected": false,
+    "launch_change_only": "--disable-gpu-compositing"
+  },
+  "ci": {
+    "outcome": "pending final test-launch commit"
+  },
+  "physical_device_tested": false,
+  "production_deployed": false,
+  "no_draw_used_for_acceptance": false,
+  "test_launcher_change_applied": true
+}

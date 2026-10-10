@@ -33,6 +33,10 @@ async def run(args, url):
     html = urlopen(url+'index.html').read().decode().replace('var Module = {', 'var Module = {\narguments:["--verbose","--developer"],', 1)
     async with async_playwright() as p:
         launch = dict(args=['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader']) if args.browser == 'chromium' else {}
+        if args.browser == 'chromium' and not args.gpu_compositing:
+            # Two SwiftShader browsers otherwise contend on GPU context switches
+            # and stall the host command buffer. Keep SDL/WebGL drawing enabled.
+            launch['args'].append('--disable-gpu-compositing')
         if args.webkit_executable: launch['executable_path'] = args.webkit_executable
         browser = await getattr(p,args.browser).launch(**launch)
         guest_browser = await getattr(p,args.browser).launch(**launch) if not args.local_only else None
@@ -440,7 +444,9 @@ async def run(args, url):
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('build',type=Path);parser.add_argument('--output',type=Path,required=True)
     parser.add_argument('--browser',choices=['chromium','webkit'],default='chromium');parser.add_argument('--webkit-executable')
-    parser.add_argument('--url');parser.add_argument('--local-only',action='store_true');parser.add_argument('--record-known-ub',action='store_true');args=parser.parse_args()
+    parser.add_argument('--url');parser.add_argument('--local-only',action='store_true');parser.add_argument('--record-known-ub',action='store_true')
+    parser.add_argument('--gpu-compositing',action='store_true',help='Reproduce the original Chromium GPU compositor mode (requires more software-renderer CPU headroom)')
+    args=parser.parse_args()
     args.output.mkdir(parents=True,exist_ok=True);relay=None;server=None
     if args.url: url=args.url.rstrip('/')+'/'
     elif args.local_only:
