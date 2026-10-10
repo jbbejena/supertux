@@ -9,7 +9,7 @@ function target(extra = {}) {
   return Object.assign({addEventListener(name, fn) {listeners.set(name, fn);},
     async fire(name, value = {}) {return listeners.get(name)?.(value);}}, extra);
 }
-function fixture(guest = false, fetch = async () => {throw Error('Unexpected fetch');}) {
+function fixture(guest = false, fetch = async () => {throw Error('Unexpected fetch');}, clock = Date) {
   const elements = new Map(['coop_status','coop_panel','coop_create','coop_close','coop_link',
     'coop_antarctica','coop_forest','coop_restart',...(guest ? ['guest_status','guest_join','guest_ack'] : [])]
     .map(id => [id, target({textContent: ''})]));
@@ -21,7 +21,7 @@ function fixture(guest = false, fetch = async () => {throw Error('Unexpected fet
     close() {this.readyState = 3;}
   }
   const document = target({hidden: false, getElementById: id => elements.get(id), querySelectorAll: () => []});
-  const window = target({document, TextEncoder, URL, URLSearchParams, WebSocket: Socket, AbortSignal, fetch, performance,
+  const window = target({document, TextEncoder, URL, URLSearchParams, WebSocket: Socket, AbortSignal, fetch, performance, Date: clock,
     location: {href: 'http://localhost/index.html', protocol: 'http:', search: '?coop=1',
       hash: '#'+new URLSearchParams({room:'a'.repeat(32),token:'b'.repeat(64),build:'c'.repeat(64)}).toString()},
     SUPERTUX_DEPLOY_CONFIG: {manifestSha256: 'c'.repeat(64)},
@@ -196,6 +196,27 @@ test('ordinary browser pause sends neutral status immediately and invalidates th
   f.window.Module.supertuxShell.active=true;engine.engineStatus(1,false,11,0);
   await receive({type:'view-ready',session:3,epoch:1,generation:10});assert.equal(engine.sceneReady(3,1),false);
   await receive({type:'view-ready',session:3,epoch:1,generation:11});assert.equal(engine.sceneReady(3,1),true);
+});
+
+test('shared-view loading excludes paused time and expiry never releases physics, including the closing callback', async () => {
+  let now=1000;
+  const f=fixture(false,async()=>({ok:true,json:async()=>({room:'a'.repeat(32),guest:'b'.repeat(64),host:'d'.repeat(64),build:'c'.repeat(64)})}),{now:()=>now});
+  await f.elements.get('coop_create').fire('click');const socket=f.sockets[0],engine=f.window.Module.supertuxCoop,shell=f.window.Module.supertuxShell;
+  const receive=value=>socket.fire('message',{data:JSON.stringify(value)});
+  await receive({type:'ready'});await receive({type:'peer',connected:true,view:true});engine.poll();
+  engine.engineStatus(1,false,1,0);assert.equal(engine.sceneReady(3,1),false);
+  shell.active=false;engine.onPause();now+=20000;
+  assert.equal(engine.sceneReady(3,1),false);assert.equal(socket.readyState,1,'A deliberate pause cannot exhaust the loading deadline');
+  shell.active=true;engine.engineStatus(1,false,2,0);
+  assert.equal(engine.sceneReady(3,1),false);now+=14999;
+  assert.equal(engine.sceneReady(3,1),false);assert.equal(socket.readyState,1);
+  now+=2;
+  assert.equal(engine.sceneReady(3,1),false,'Closing the connection must not release physics in the same native update');
+  assert.equal(shell.active,false);assert.equal(engine.state.lost,true);assert.equal(socket.readyState,3);
+  assert.equal(f.elements.get('coop_restart').hidden,false);assert.equal(typeof engine.canResume(),'string');
+  assert.deepEqual(Array.from(engine.poll()),[3,0,0,0]);assert.equal(engine.poll(),undefined);
+  engine.engineStatus(-1,false,3,0);
+  assert.equal(engine.sceneReady(3,1),false,'A retired view remains blocked until the title restart');
 });
 
 test('permanent-loss title restart waits for the save flush before navigating', async () => {

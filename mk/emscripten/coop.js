@@ -125,6 +125,9 @@
       get connection() { return connection; },
       wantsView() {return !!(connection?.ready && guestView && state.reserved === 1 && state.generation && Date.now() - lastView >= 100);},
       sceneReady(session, epoch) {
+        // Permanent loss holds the simulation until the save-preserving title
+        // restart, including after close() retires guestView synchronously.
+        if (lost) return false;
         if (!guestView || state.reserved !== 1) return true;
         if (!module.supertuxShell?.active) {sceneDeadline=0;return false;}
         const next=`${session}/${epoch}`;
@@ -133,7 +136,7 @@
         if (sceneKey!==next) {sceneKey=next;sceneLoaded=null;sceneDeadline=0;}
         if (sceneLoaded===next) return true;
         if (!sceneDeadline) sceneDeadline=Date.now()+15000;
-        if (Date.now()>sceneDeadline) {connection?.close('Shared view loading stalled. Return to the title screen and create a new room.');return true;}
+        if (Date.now()>sceneDeadline) {connection?.close('Shared view loading stalled. Return to the title screen and create a new room.');return false;}
         return false;
       },
       view(snapshot) {
