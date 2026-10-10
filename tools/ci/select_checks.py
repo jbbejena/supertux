@@ -39,7 +39,7 @@ def select(paths, full=False):
             continue
         if path.startswith(('src/', 'tests/')):
             result['lint'] = result['web'] = result['linux'] = True
-            if path.startswith(('src/audio/', 'src/control/')) or path in ('src/supertux/game_session.cpp', 'src/supertux/screen_manager.cpp'):
+            if path.startswith(('src/audio/', 'src/control/', 'src/squirrel/')) or path in ('src/supertux/game_session.cpp', 'src/supertux/screen_manager.cpp'):
                 result['debug'] = True
             continue
         if path.startswith(('.github/actions/', '.github/workflows/', 'tools/ci/')):
