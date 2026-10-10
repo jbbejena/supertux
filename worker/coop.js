@@ -223,8 +223,14 @@ export class CoopRoom {
       const host = this.peer('host'), session = host?.deserializeAttachment().session;
       if (!room.interruption && host?.deserializeAttachment().hello && session?.enabled && session.generation === message.generation &&
           (info.generation !== message.generation || message.sequence > info.sequence)) {
-        info.generation = message.generation; info.sequence = message.sequence;
-        this.send(host, {type: 'input', generation: message.generation, sequence: message.sequence, mask: message.mask});
+        // A blocked host can fill its strict receive window before the next
+        // heartbeat alarm. Freeze and retire input rather than destroy the
+        // authenticated room; no extra edge or backlog is stored.
+        if ((host.deserializeAttachment().inFlight || 0) >= 32) await this.interrupt(room);
+        else {
+          info.generation = message.generation; info.sequence = message.sequence;
+          this.send(host, {type: 'input', generation: message.generation, sequence: message.sequence, mask: message.mask});
+        }
       }
     } else { this.close(socket, 1008, 'Message not allowed for role'); return; }
     info.last = now;

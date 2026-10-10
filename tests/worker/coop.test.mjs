@@ -126,8 +126,12 @@ test('unacknowledged receiver has a fixed message window; role fields are reject
   await ready(f,host);await ready(f,guest);
   await send(f.object,host,{type:'session',generation:1,enabled:true});
   for(let i=0;i<33 && !host.closed;i++) await send(f.object,guest,{type:'input',generation:1,sequence:i+1,mask:i%2});
-  assert.equal(host.closed.code,1013);
+  assert.equal(host.closed,undefined);
+  assert.ok(f.room.interruption);
+  assert.equal(host.info.inFlight,32);
   assert.ok(host.messages.length <= 32);
+  f.room.interruption.started=Date.now()-16000;
+  await f.object.alarm();assert.equal(host.closed.code,1001);assert.equal(f.state.storage.room,null);
   const other=fixture(), client=other.add('guest');await ready(other,client);
   await send(other.object,client,{type:'input',generation:1,sequence:1,mask:2,role:'host'});
   assert.equal(client.closed.code,1008);
@@ -213,6 +217,27 @@ test('coalesced recovery status cannot replay an old recovered notification afte
   await send(f.object,guest,{type:'seen'});
   assert.deepEqual(guest.messages.at(-1),{type:'connection',interrupted:true});
   assert.equal(guest.info.inFlight,32);
+});
+
+test('a full host input window starts bounded neutral recovery without closing sockets or queuing extra edges',async()=>{
+  const f=fixture(),host=f.add('host'),guest=f.add('guest');await ready(f,host);await ready(f,guest);
+  await send(f.object,host,{type:'session',generation:1,enabled:true});
+  host.info.inFlight=32;
+  await send(f.object,guest,{type:'input',generation:1,sequence:1,mask:2});
+  assert.ok(f.room.interruption);assert.equal(host.closed,undefined);assert.equal(guest.closed,undefined);
+  assert.equal(host.info.inFlight,32);assert.equal(host.info.pending.connection.interrupted,true);
+  await send(f.object,guest,{type:'input',generation:1,sequence:2,mask:0});
+  assert.equal(host.messages.filter(x=>x.type==='input').length,0);
+  await send(f.object,host,{type:'seen'});
+  assert.deepEqual(host.messages.at(-1),{type:'connection',interrupted:true});
+  await send(f.object,host,{type:'session',generation:1,enabled:false});assert.ok(f.room.interruption);
+  await send(f.object,host,{type:'session',generation:2,enabled:false});assert.equal(f.room.interruption,undefined);
+  while(host.info.inFlight>0)await send(f.object,host,{type:'seen'});
+  await send(f.object,host,{type:'session',generation:3,enabled:true});
+  await send(f.object,guest,{type:'input',generation:1,sequence:3,mask:2});
+  assert.equal(host.messages.filter(x=>x.type==='input').length,0);
+  await send(f.object,guest,{type:'input',generation:3,sequence:1,mask:0});
+  assert.deepEqual(host.messages.at(-1),{type:'input',generation:3,sequence:1,mask:0});
 });
 
 test('unsolicited receive credits cannot bypass rate or backpressure limits', async () => {

@@ -5,6 +5,7 @@
 #include <cassert>
 #include <iostream>
 #include <simplesquirrel/simplesquirrel.hpp>
+#include "squirrel/squirrel_random.hpp"
 #include "squirrel/squirrel_scheduler.hpp"
 #include "supertux/level.hpp"
 #include "util/log.hpp"
@@ -54,4 +55,28 @@ int main()
   actual.update(41);
   assert(flag(handle, "done_a"));
   assert(errors == 0);
+
+  Random expected;
+  expected.seed(1); gameRandom.seed(1);
+  vm.addFunc("rand", [](HSQUIRRELVM target) -> SQInteger {return squirrel_random(target, gameRandom);});
+  vm.run(vm.compileSource(R"(
+    random_values <- [];
+    for (local i=0; i<64; ++i) {
+      local value = rand();
+      if (typeof value != "integer") throw "rand returned a non-integer";
+      random_values.append(value);
+      // The intro's bush movement performs this arithmetic after a wait.
+      local offset = 3607.0 + (value % 6) - 3;
+      if (offset < 3604 || offset > 3609) throw "invalid bush offset";
+    }
+  )"));
+  sq_pushroottable(handle); sq_pushstring(handle, "random_values", -1);
+  assert(SQ_SUCCEEDED(sq_get(handle, -2)));
+  for (int i=0; i<64; ++i)
+  {
+    sq_pushinteger(handle, i); assert(SQ_SUCCEEDED(sq_get(handle, -2)));
+    SQInteger value = 0; assert(SQ_SUCCEEDED(sq_getinteger(handle, -1, &value)));
+    assert(value == expected.rand()); sq_pop(handle, 1);
+  }
+  sq_pop(handle, 2);
 }
