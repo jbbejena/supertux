@@ -86,6 +86,13 @@ the setting without changing workflow triggers, required check names, concurrenc
 permissions or artifact verification. See [PR 17 checks](https://github.com/jbbejena/supertux/pull/17/checks)
 for final-revision CI; local results do not imply a successful hosted run.
 
+The completed run on `0077b1c` passed Release, Linux and lint/focused checks, but
+Debug failed touch-only Restart before reaching co-op. The separate
+[touch-menu investigation](TOUCH_MENU_RESTART_INVESTIGATION.md) reproduces the
+ignored-press/late-release sequence and replaces input-frame assumptions with
+bounded native menu readiness. It preserves the compositor settings and all
+existing restart and gameplay assertions.
+
 Both launchers retain the original GPU compositor mode explicitly:
 
 ```bash

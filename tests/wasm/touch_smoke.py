@@ -15,7 +15,7 @@ import json
 import re
 import threading
 from pathlib import Path
-from playwright.async_api import async_playwright
+from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
 from browser_smoke import Handler, KNOWN_UPSTREAM_UB
 
 
@@ -53,7 +53,17 @@ class Fingers:
     async def down(self, finger, pos): await self.change('down', finger, pos)
     async def move(self, finger, pos): await self.change('move', finger, pos)
     async def up(self, finger): await self.change('up', finger)
+    async def menu_ready(self, expected=None):
+        # Native pointer events are ignored during MenuTransition. Input-frame
+        # counters advance before menu processing/drawing and cannot establish
+        # readiness, especially when software rendering delays the first draw.
+        await self.page.wait_for_function('''expected => {
+            const state = Module.ccall('get_browser_menu_state', 'number', [], []);
+            return expected === null ? !(state & 2) : state === expected;
+        }''', arg=expected, timeout=2000)
+
     async def tap(self, pos, duration=120):
+        await self.menu_ready()
         await self.down(9, pos)
         # Sample after dispatch: a frame between the old pre-dispatch read and
         # the event does not prove that native input consumed this touch edge.
@@ -66,6 +76,7 @@ class Fingers:
         await self.page.wait_for_timeout(120)
         if release_frame is not None:
             await self.page.wait_for_function('(frame)=>phase3InputFrames>frame',arg=release_frame)
+        await self.menu_ready()
 
     async def release(self):
         for finger in list(self.points): await self.up(finger)
@@ -129,10 +140,10 @@ async def run(args, url):
         await page.wait_for_function('Module.supertuxReady === true', timeout=180000)
         await page.locator('#start_button').tap()
         await page.wait_for_function('Module.supertuxShell.active')
-        # Wait for actual native input updates between menu gestures. Short
-        # wall-clock taps can otherwise collapse DOWN/JUMP into one slow frame
-        # on CI, leaving the menu paused instead of selecting Restart Level.
-        # This observes the existing per-frame bridge; it injects no controls.
+        # Keep touch edges in separate native input updates. This bridge runs
+        # before menu processing/drawing; Fingers.menu_ready separately waits
+        # for transitions before the next gesture. Neither observer injects
+        # controls or changes the native menu state.
         await page.evaluate('''() => {
           window.phase3InputFrames=0;
           const original=Module.supertuxCoop.engineStatus;
@@ -216,22 +227,63 @@ async def run(args, url):
             # Use the ordinary touch menu to reset enemies between unrelated
             # groups, rather than changing player state or granting immunity.
             await fingers.release()
-            await fingers.tap(g['pause'])
-            # Tap Restart Level directly, independent of menu hover/selection.
-            # This fresh level has no checkpoint; developer mode gives eight
-            # 24px rows, with Restart 12 logical pixels above the midpoint.
-            vp = g['viewport']
-            await fingers.tap([vp['x'] + vp['width'] / 2,
-                               vp['y'] + (480 / 2 - 12) * vp['height'] / 480])
-            # Packaged spawn lane is x=96, above flat ground at y=704. Small
-            # Tux lands at y=672 or the 673.196 settled collision contact.
             try:
+                # Tap Restart directly, independent of menu hover/selection.
+                # No checkpoint; developer mode gives eight 24px rows, with
+                # Restart 12 logical pixels above the midpoint.
+                vp = g['viewport']
+                restart_pos = [vp['x'] + vp['width'] / 2,
+                               vp['y'] + (480 / 2 - 12) * vp['height'] / 480]
+                premature = label == 'observer-ready-restart'
+                if premature:
+                    # Negative control: queue an actual SDL pointer press in
+                    # the first native frame with the opening transition active.
+                    # This proves why an input-frame counter is insufficient;
+                    # it changes no game/menu state through the diagnostic API.
+                    await page.evaluate('''pos => {
+                        window.phase3EarlyTap = {original: Module.supertuxCoop.beforeFrame, pressed: null};
+                        Module.supertuxCoop.beforeFrame = (...args) => {
+                            const state = Module.ccall('get_browser_menu_state', 'number', [], []);
+                            if (state === 3 && phase3EarlyTap.pressed === null) {
+                                phase3EarlyTap.pressed = state;
+                                Module.canvas.dispatchEvent(new PointerEvent('pointerdown', {
+                                    pointerType:'touch', pointerId:37, button:0, buttons:1,
+                                    clientX:pos[0], clientY:pos[1], bubbles:true, cancelable:true
+                                }));
+                            }
+                            return phase3EarlyTap.original(...args);
+                        };
+                    }''', restart_pos)
+                try:
+                    await fingers.tap(g['pause'])
+                finally:
+                    if premature:
+                        await page.evaluate('Module.supertuxCoop.beforeFrame = phase3EarlyTap.original')
+                await fingers.menu_ready(1) # Open menu, completed transition, no dialog.
+                if premature:
+                    assert await page.evaluate('phase3EarlyTap.pressed') == 3, 'Opening transition was not observed'
+                    frame = await page.evaluate('''pos => {
+                        Module.canvas.dispatchEvent(new PointerEvent('pointerup', {
+                            pointerType:'touch', pointerId:37, button:0, buttons:0,
+                            clientX:pos[0], clientY:pos[1], bubbles:true, cancelable:true
+                        }));
+                        return phase3InputFrames;
+                    }''', restart_pos)
+                    await page.wait_for_function('(frame)=>phase3InputFrames>frame', arg=frame, timeout=2000)
+                    await fingers.menu_ready(1) # A late release must not activate the ignored press.
+                    await page.evaluate('delete window.phase3EarlyTap')
+                await fingers.tap(restart_pos)
+                await fingers.menu_ready(0) # Restart must actually close the menu.
+                # Packaged spawn is x=96, above flat ground at y=704. Small
+                # Tux lands at y=672 or the 673.196 settled collision contact.
                 restored = await state(label, dict(left=False,right=False,jump=False,action=False), 400,
                                        lambda sample: abs(sample['x'] - 96) < 1 and 672 <= sample['y'] <= 674)
-            except AssertionError:
+            except (AssertionError, PlaywrightTimeoutError):
                 await page.screenshot(path=str(args.output / (label + '-failure.png')))
                 raise
             assert abs(restored['x'] - 96) < 1 and 672 <= restored['y'] <= 674, restored
+            if premature:
+                report['checks'].append('A direct pointer press during the native opening transition is ignored; its later release keeps the menu open; a ready-menu touch restart closes it and restores the real spawn')
 
         # Console installation takes longer in instrumented/software-rendered
         # builds. Reset enemies through the ordinary touch menu before starting

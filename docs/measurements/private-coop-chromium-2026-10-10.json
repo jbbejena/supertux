@@ -442,7 +442,24 @@
     "launch_change_only": "--disable-gpu-compositing"
   },
   "ci": {
-    "outcome": "pending final test-launch commit"
+    "run": 38029999586,
+    "headSha": "0077b1cb53a3865229432d67fbc2692234a5e009",
+    "conclusion": "failure",
+    "release": "success",
+    "debug": "failure: touch restart-before-cancel before co-op validation",
+    "nativeLinux": "success",
+    "lintFocused": "success",
+    "aggregate": "failure",
+    "reruns": 0,
+    "failedDebugArtifact": 11662032866,
+    "nativeEventTraceCaptured": false,
+    "unchangedLocalDebugTouch": {
+      "outcome": "passed",
+      "checks": 10
+    },
+    "url": "https://github.com/jbbejena/supertux/actions/runs/38029999586",
+    "acceptedGreen": false,
+    "followUp": "../TOUCH_MENU_RESTART_INVESTIGATION.md"
   },
   "physical_device_tested": false,
   "production_deployed": false,

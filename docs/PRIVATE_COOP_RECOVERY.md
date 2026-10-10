@@ -375,6 +375,13 @@ unverified. Follow [PRIVATE_COOP_PHONE_ACCEPTANCE.md](PRIVATE_COOP_PHONE_ACCEPTA
 swap host/guest roles, and include interruption during held touch input and music,
 explicit Resume, permanent guest loss and saved-game preservation.
 
+The subsequent Debug touch-menu gate failure is investigated in
+[TOUCH_MENU_RESTART_INVESTIGATION.md](TOUCH_MENU_RESTART_INVESTIGATION.md).
+An input-frame counter did not establish that the opening animation had finished;
+tests now observe bounded native menu readiness and retain actual spawn checks.
+The early-press/late-release regression runs through SDL without changing native
+menu behavior or deploying a new private staging build.
+
 ## Try the complete local preview
 
 Build with the pinned Emscripten 6.0.11/vcpkg toolchain and assemble the complete
