@@ -185,30 +185,32 @@ async def run(args, url):
         report['checks'].append('Host Pause freezes presentation and releases guest input; Resume requires neutral state with a fresh generation')
 
         async def script(command, active=True, paused=True):
-            await host.locator('#canvas').focus()
-            if paused:
-                await host_key('Escape')
-                await host.wait_for_function('!Module.supertuxCoop.state.enabled')
-            if callable(command): command=await command()
-            await host_key('Backquote')
-            await host.keyboard.type(command,delay=4);await host_key('Enter')
-            assert any('> '+command in line for line in logs[-30:]),logs[-10:]
-            await host_key('Backquote')
-            if active and paused: await host_key('Escape')
-            if active:
-                try:
+            try:
+                await host.locator('#canvas').focus()
+                if paused:
+                    await host_key('Escape')
+                    await host.wait_for_function('!Module.supertuxCoop.state.enabled')
+                if callable(command): command=await command()
+                await host_key('Backquote')
+                await host.keyboard.type(command,delay=4);await host_key('Enter')
+                assert any('> '+command in line for line in logs[-30:]),logs[-10:]
+                await host_key('Backquote')
+                if active and paused: await host_key('Escape')
+                if active:
                     await host.wait_for_function('Module.supertuxCoop.state.enabled')
                     # Resume reaches the host before its session/baseline can
                     # reach the guest. An input sent in that gap is correctly
                     # ignored; drive the next fixture only after presentation.
                     await guest.wait_for_function('SupertuxView.playable && supertuxGuest.state.mask===0')
-                except Exception:
-                    trace=await host.evaluate('viewLifecycle');
-                    (args.output/'script-lifecycle-failure.json').write_text(json.dumps(trace,indent=2)+'\n')
-                    print('VIEW_SCRIPT_FAILED',command,await guest.evaluate('({guest:supertuxGuest.state,view:SupertuxView.state,status:document.querySelector("#guest_status").textContent,viewStatus:document.querySelector("#view_status").textContent})'),await host.evaluate('({state:Module.supertuxCoop.state,status:document.querySelector("#coop_status").textContent,packet:window.lastViewPacket})'),flush=True)
-                    await host.locator('#canvas').screenshot(path=str(args.output/'script-host-failure.png'))
-                    await guest.screenshot(path=str(args.output/'script-guest-failure.png'))
-                    raise
+            except Exception:
+                diagnostic={'command':str(command),
+                    'host':await host.evaluate('({state:Module.supertuxCoop.state,active:Module.supertuxShell.active,status:document.querySelector("#coop_status").textContent,lifecycle:viewLifecycle})'),
+                    'guest':await guest.evaluate('({state:supertuxGuest.state,playable:SupertuxView.playable,status:document.querySelector("#guest_status").textContent})')}
+                (args.output/'script-lifecycle-failure.json').write_text(json.dumps(diagnostic,indent=2)+'\n')
+                print('VIEW_SCRIPT_FAILED',str(command),diagnostic['host']['state'],diagnostic['host']['status'],flush=True)
+                await host.locator('#canvas').screenshot(path=str(args.output/'script-host-failure.png'))
+                await guest.screenshot(path=str(args.output/'script-guest-failure.png'))
+                raise
         await script('sector.Tux2.kill(true);')
         await sample('death',"SupertuxView.state.drawn.players[1].dead>0")
         # Press Action only after native death is complete. A held Action first

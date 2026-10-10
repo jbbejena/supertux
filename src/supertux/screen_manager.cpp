@@ -799,14 +799,9 @@ void ScreenManager::loop_iter()
   bool always_draw = g_debug.draw_redundant_frames || g_config->frame_prediction;
 
   if (elapsed_time < seconds_per_step && !always_draw) {
-#ifndef __EMSCRIPTEN__
     // Sleep a bit because not enough time has passed since the previous
     // logical game step
     SDL_Delay(static_cast<Uint32>(1000.0f * (seconds_per_step - elapsed_time)));
-#endif
-    // The web loop is paced by requestAnimationFrame. In a single-threaded
-    // Emscripten build SDL_Delay busy-spins; return control to the browser
-    // while keeping the existing physics accumulator for the next callback.
     return;
   }
 
