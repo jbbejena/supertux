@@ -1312,7 +1312,61 @@
     "url": "https://supertux-private-input-proof.jshbjnr.workers.dev/index.html?coop=1",
     "publication": "completed",
     "frontend_manifest_payload_readiness": "success",
-    "hosted_browser_reports": "See exact staging run and its retained Chromium/WebKit evidence",
-    "physical_device_tested": false
+    "hosted_browser_reports": {
+      "chromium": {
+        "result": "failure",
+        "fixture": "checkpoint/all-players-dead",
+        "host_gap_ms": 3368.1,
+        "state": "Both sockets authenticated; neutral input; host safely paused awaiting trusted Resume"
+      },
+      "webkit": {
+        "result": "not run",
+        "reason": "Original workflow stopped after Chromium failed"
+      }
+    },
+    "physical_device_tested": false,
+    "acceptance": "blocked: intermittent hosted host stalls; physical devices unverified",
+    "independent_hosted_webkit": {
+      "result": "success",
+      "source": "7c7926478e40f24cf6bca972609f1a86ee5d1de4",
+      "checks": 23,
+      "browser": "26.5",
+      "automation": "Playwright 1.62.0; Linux WebKit; 844x390 touch emulation; no CDP profiling",
+      "physical_device_tested": false,
+      "errors": [],
+      "metrics": {
+        "input_to_visible_30px_ms": 348,
+        "snapshot_count": 102,
+        "snapshot_bytes_max": 469,
+        "snapshot_bytes_per_second": 4181,
+        "snapshot_hz": 9.4,
+        "interpolation_delay_ms": 90,
+        "buffer_limit": 8,
+        "campaign_selection_to_ready_ms": 765,
+        "campaign_input_to_30_world_px_ms": 592,
+        "campaign_interpolated_draws": 10,
+        "campaign_snapshot_bytes_max": 52230,
+        "campaign_snapshot_hz": 6.8,
+        "campaign_snapshot_bytes_per_second": 230957
+      },
+      "original_workflow_conclusion": "failure retained; WebKit run independently after original Chromium failure"
+    },
+    "local_hosted_chromium_environment_failure": {
+      "result": "failed before game startup; not a gameplay measurement",
+      "reason": "Cloud proxy CA absent from Chromium NSS trust; ERR_CERT_AUTHORITY_INVALID; game readiness timeout",
+      "tls_verification": "retained",
+      "persistent_trust_store": "unchanged; approval review rejected persistent CA insertion",
+      "isolated_temporary_trust_probe": "did not resolve Chromium trust; temporary store deleted",
+      "acceptance_source": "Hosted GitHub runner checks; separate from cloud-local proxy trust"
+    }
+  },
+  "unused_renderer_experiment": {
+    "commit": "e9c7c04bcce7b1d650e02ba8438f0d2e2c816bbf",
+    "revert": "be5fb34a542a1e219d48b4e2f9f5d08bf6dd2b44",
+    "scope": "Custom OpenGL VAO layout setup; inactive in default WASM which forces SDL3 opengles2",
+    "ordinary_local_checks": "23 each passed: Release Chromium, Release WebKit, Debug Chromium; no evidence of optimization because renderer path was inactive",
+    "diagnostic_result": "failure: growth-pickup fixture; 2839 ms host gap; safely paused with both sockets authenticated",
+    "sampled_vertex_attrib_pointer_ms": 19607.7,
+    "claim": "No final rendering change or reliable speed improvement; sample durations differ and include idle failure wait"
   }
 }

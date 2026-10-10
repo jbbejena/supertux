@@ -23,9 +23,14 @@ uninterrupted acceptance or establish physical-phone performance.
 
 The [separate staging run](https://github.com/jbbejena/supertux/actions/runs/38020319030)
 reuses that exact successful Release artifact; frontend/manifest/payload readiness
-has passed. Its retained Chromium/WebKit two-browser reports provide hosted
-acceptance status. Physical iPhone, Android and separate-network tests below
-remain unverified. No production publication or merge is part of this work.
+has passed. Hosted Chromium failed during checkpoint restart after a 3,368.1 ms
+host stall; its sockets recovered with neutral input and stayed paused for Resume.
+That run is failed and its original fail-fast step did not run WebKit. An independent
+ordinary hosted Linux WebKit 26.5 run passes all 23 checks with no console/script
+errors. The PR now runs both hosted checks and fails if either fails. Its summary
+distinguishes successful delivery from the browser outcome. Physical iPhone, Android
+and separate-network tests below remain unverified. No production publication
+or merge is part of this work.
 Normal Mobile Web Deploy does not enable the private rooms.
 
 To republish this tested runtime, use the complete source and successful run:

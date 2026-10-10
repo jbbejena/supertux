@@ -15,8 +15,14 @@ Its second Release attempt passes on the identical source and assertions; the
 first failure remains recorded. Both non-PR configurations are successful.
 [Private staging publication](https://github.com/jbbejena/supertux/actions/runs/38020319030)
 reuses that exact Release artifact. The Worker now serves this runtime and its
-frontend/manifest/payload readiness checks pass. Hosted two-browser results are
-retained in that run; physical-device acceptance remains separate.
+frontend/manifest/payload readiness checks pass. Hosted Chromium fails during
+checkpoint restart after a 3,368.1 ms host stall; the room recovers with neutral
+input and remains paused for trusted Resume. The run is failed, and its original
+fail-fast step did not run WebKit. This PR now runs both hosted browser checks
+and returns failure if either fails. Physical-device acceptance remains separate.
+An independent ordinary Linux WebKit 26.5 run against that exact published build
+passes all 23 checks with no console/script errors. It does not change the failed
+staging workflow's conclusion or constitute physical Safari acceptance.
 
 ## Failure and resulting behavior
 
@@ -141,8 +147,16 @@ WebGL state submission on this cloud software renderer. It does not isolate
 every stall or establish physical-phone performance. The earlier profiling
 attempt failed after the campaign screenshot before reaching its target and
 captured no profile. Neither diagnostic replaces the failed ordinary Release
-run. Reducing redundant vertex-attribute setup is a concrete follow-up to
-measure separately; the recovery patch retains existing rendering and pacing.
+run. WASM explicitly selects `VIDEO_SDL`; SDL3 reports its `opengles2` backend.
+The native OpenGL painter is not the active rendering path. A subsequent
+experiment configured the custom OpenGL VAO layouts once, but it did not affect
+the SDL renderer. Its ordinary Release Chromium/WebKit and Debug Chromium runs
+passed all 23 checks, while its sampled run still failed after a 2,839 ms gap and
+recorded 19,607.7 ms in `vertexAttribPointer`. Those passes do not demonstrate an
+optimization. The unused change was reverted. The different profile durations
+(including a failed command's wait) cannot establish a speed comparison.
+Reducing SDL draw/state submission needs separate targeted measurements and
+visual validation; this patch retains existing rendering and pacing.
 
 ## Repeated measurements of the rejected experiment
 
@@ -257,6 +271,27 @@ Debug already passed. The resulting successful non-PR run provides the exact
 artifact for private staging. Five pre-existing Debug sanitizer sites remain explicitly
 annotated; new sites fail. Hosted readiness/browser results are recorded in
 [the exact-source private publication run](https://github.com/jbbejena/supertux/actions/runs/38020319030).
+
+Hosted Chromium failed the checkpoint/all-players-dead fixture after a
+3,368.1 ms host gap. Both sockets remained authenticated, held input was gone,
+and the host stayed paused awaiting explicit Resume. This validates safe
+interruption behavior but fails uninterrupted browser acceptance. Hosted WebKit
+was not run by that original workflow after Chromium failed. The current workflow
+runs the two checks sequentially even if the first fails, retains both evidence
+directories and still fails the job. Once delivery readiness passes, its summary
+also reports the published URL and browser outcome even if browser acceptance
+fails, so publication success cannot be confused with passing playability checks.
+An independent hosted Linux WebKit 26.5 run passes all 23 checks without profiling
+or changed assertions. Its campaign input-to-30-world-pixels observation is 592 ms,
+with 6.8 snapshots/second and 230,957 snapshot bytes/second in that run; these are
+single-run observations, not a response-time guarantee. Host and guest screenshots
+retain native terrain, backgrounds and both players. The draft PR remains blocked on reliable
+hosted acceptance; a passing rerun alone does not explain the intermittent stalls.
+An additional cloud-local hosted Chromium attempt could not load the game because
+Chromium rejected the environment proxy's CA (`ERR_CERT_AUTHORITY_INVALID`). It
+timed out before game readiness and supplies no gameplay measurement. TLS checks
+remain enabled, and the existing persistent trust store was not changed. Hosted
+Chromium acceptance uses the GitHub runner without this cloud-local trust issue.
 
 Previous revisions' passing checks do not substitute for final-source results.
 The restored-pacing `87d24f9f` passed local Chromium shared-view checks, but its
