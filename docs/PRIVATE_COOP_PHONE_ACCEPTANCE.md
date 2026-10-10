@@ -1,37 +1,61 @@
 # Private co-op: HTTPS staging and phone acceptance
 
-Phase 7B is merged through [PR #14](https://github.com/jbbejena/supertux/pull/14),
-at `c385d97aba1476a984e497a33c1bd24183c55293` on `mobile-web-audit`.
-Its [supported-level handoff](PRIVATE_COOP_SUPPORTED_LEVEL.md) covers the original
-Welcome to Antarctica level. **The published URL below still serves Phase 7A**;
-merging code alone does not update that separately published staging Worker.
-On 2026-10-09, GitHub rejected workflow dispatch with HTTP 422,
-“Actions has been disabled for this repository.” CI and a new HTTPS publication
-require Actions to be re-enabled. No production deployment is part of Phase 7B.
+The [private HTTPS host](https://supertux-private-input-proof.jshbjnr.workers.dev/index.html?coop=1)
+is separate from production. The final recovery/save-correction runtime is
+`52d8bf370bee4b97b1a943beec695274fb13b518`, based on merged Phase 8B at
+`0a240fc3445efd08610b9d66bf6b647a512fbfca`. Check the staging origin's
+`BUILD_INFO.json` to identify the currently published runtime; publication requires
+the exact successful non-PR artifact described below.
+It supports the original Welcome to Antarctica level and the static diagnostic
+arena, with smoother guest presentation, neutral shared pause, bounded socket
+recovery, trusted Resume and a save-preserving title restart. The
+[supported-level handoff](PRIVATE_COOP_SUPPORTED_LEVEL.md),
+[smoothing measurements](PRIVATE_COOP_SMOOTHING.md), and
+[recovery implementation and failures](PRIVATE_COOP_RECOVERY.md) describe scope.
+The implementation remains under review in
+[PR #17](https://github.com/jbbejena/supertux/pull/17).
 
-Phase 8A retried dispatch after that merge and received the same HTTP 422.
-The existing preview therefore remains Phase 7A. Local performance measurements
-and the next staged implementation steps are in
-[PRIVATE_COOP_PHASE8.md](PRIVATE_COOP_PHASE8.md). Workflow listings reporting
-`active` do not establish repository-wide Actions availability; the integration
-cannot inspect those permissions (HTTP 403).
+The initial published `7c792647` recovery runtime passes all six
+[focused PR checks](https://github.com/jbbejena/supertux/actions/runs/38016818646). The
+[non-PR exact-source WASM run](https://github.com/jbbejena/supertux/actions/runs/38016814903)
+passes Release/Debug after one failed-Release-job rerun on the identical source.
+The first Release attempt and ordinary local Chromium run failed after long host
+stalls; their authenticated rooms recovered with neutral input and stayed paused
+awaiting trusted Resume. Those failures remain recorded. They do not count as
+uninterrupted acceptance or establish physical-phone performance.
 
-Phase 8B implements smoother guest movement/camera locally. Its exact runtime,
-equivalent comparisons and remaining acceptance gates are recorded in
-[PRIVATE_COOP_SMOOTHING.md](PRIVATE_COOP_SMOOTHING.md). It has not been published
-to the URL below.
+The [separate staging run](https://github.com/jbbejena/supertux/actions/runs/38020319030)
+reuses that exact successful Release artifact; frontend/manifest/payload readiness
+has passed. Hosted Chromium failed during checkpoint restart after a 3,368.1 ms
+host stall; its sockets recovered with neutral input and stayed paused for Resume.
+That run is failed and its original fail-fast step did not run WebKit. An independent
+ordinary hosted Linux WebKit 26.5 run passes all 23 checks with no console/script
+errors. The PR now runs both hosted checks and fails if either fails. Its summary
+distinguishes successful delivery from the browser outcome. Physical iPhone, Android
+and separate-network tests below remain unverified. No production publication
+or merge is part of this work.
+Normal Mobile Web Deploy does not enable the private rooms. The final save
+correction also refuses to reload after failed/unavailable storage and offers
+a retry, with compiled settings/progression-fixture hydration coverage. Its
+[focused validation](https://github.com/jbbejena/supertux/actions/runs/38023547972)
+and [non-PR validation](https://github.com/jbbejena/supertux/actions/runs/38023544506)
+are separate from those initial reports. The first non-PR Release attempt fails
+after a 2,508.1 ms information-panel host gap; Debug passes. That failure is
+retained alongside the one failed-job rerun on unchanged source/assertions.
 
-For the new runtime, first run the WebAssembly workflow on the reviewed branch,
-then publish only its exact successful, non-PR validation artifact:
+To publish the final correction, first require that its non-PR run concludes
+**success**; then use the complete source and that explicit run:
 
 ```sh
-gh workflow run wasm.yml --repo jbbejena/supertux --ref mobile-web-audit
-# Wait for both Release and Debug, then use their exact source and run identity:
 gh workflow run mobile-web-preview.yml --repo jbbejena/supertux \
-  --ref mobile-web-audit \
-  -f ref=FULL_TESTED_RUNTIME_SHA -f validation_run_id=SUCCESSFUL_RUN_ID \
-  -f publish_coop=true
+  --ref codex/private-coop-stall-recovery \
+  -f ref=52d8bf370bee4b97b1a943beec695274fb13b518 \
+  -f validation_run_id=38023544506 -f publish_coop=true
 ```
+
+For a different runtime, first run `wasm.yml` on its reviewed branch and wait for
+both configurations. Supply its exact successful non-PR validation run; never
+use a build-only preview, PR artifact or unverified latest artifact.
 
 For Phase 7B phone acceptance, choose **Play Welcome to Antarctica** in step 3.
 Additionally verify coin pickup, enemy contact, growth, information panels,
@@ -70,7 +94,7 @@ the Worker, browser code and complete game artifact use the tested runtime. This
 allows publication tooling to be reviewed without rebuilding or changing that
 runtime. The build job contains no deployment secrets.
 
-For the validated merged Phase 7A runtime:
+The historical Phase 7A publication used:
 
 ```sh
 gh workflow run mobile-web-preview.yml --repo jbbejena/supertux \
@@ -128,7 +152,7 @@ cache. Production saves are not imported. The entire room currently expires afte
 1. Phone A: use Start, expand **Private co-op**, then **Create room**.
 2. Share **Guest shared view** with Phone B. That invitation contains a temporary
    guest credential; keep it private. Wait for Player 2 to join.
-3. On the newly published Phase 7B runtime, Phone A chooses **Play Welcome to
+3. On the newly published supported-level runtime, Phone A chooses **Play Welcome to
    Antarctica**. Both screens should show the original level and both players.
    Phone A controls Player 1; Phone B controls Player 2. The older Phase 7A URL
    only offers **Start shared view proof**, a static diagnostic arena.
@@ -136,8 +160,20 @@ cache. Production saves are not imported. The entire room currently expires afte
    both living players remain visible through the native shared camera.
 5. Pause/resume on the host, rotate each phone, and inspect safe areas and control
    visibility. Release fingers before continuing; old held inputs must not replay.
-6. Background/lock each phone, lose and restore Wi-Fi, and try again. Recovery is
-   explicit: return the host to the title screen, rejoin, then restart the scene.
+6. Hold movement while briefly interrupting the host/connection. On the recovery
+   runtime, both players must stop, held fingers/keys must clear, and the game
+   must stay paused after the connection recovers. Release controls, then use
+   the host's trusted **Resume** button. Keep the co-op panel expanded once to
+   confirm it cannot cover Resume. A permanent loss (including guest backgrounding
+   or the bounded 15-second recovery timeout) blocks Resume: use **Return to
+   title**, create a new room and open its new invitation in the same guest tab.
+   On the final save-correction runtime, a failed/unavailable save keeps the page
+   paused and asks you to retry Return to title. Confirm that a successful retry
+   preserves settings and saved progression. Closing/reloading while storage
+   remains unavailable discards unsaved session changes; do not count that as a
+   successful save-preserving restart. Automated coverage includes a progression
+   byte fixture; earned progression on physical phones still needs this check.
+   The older runtime requires a title restart after any disconnect.
 7. Where death occurs, wait for **Tap Action** before ordinary respawn; all-player
    death must restart with fresh display state.
 8. Reload the host and confirm existing campaign saves/settings survive. The

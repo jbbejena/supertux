@@ -45,7 +45,7 @@ function runtime(visual = true) {
     setTimeout: callback => { timers.set(++serial, callback); return serial; },
     clearTimeout: id => timers.delete(id)});
   const frame = () => { const batch = [...frames.values()]; frames.clear(); batch.forEach(callback => callback()); };
-  return {ids, document, window, view, calls, frames, timers, frame, shell: Module.supertuxShell,
+  return {module: Module, ids, document, window, view, calls, frames, timers, frame, shell: Module.supertuxShell,
     safe: (x, y) => { safeX = x; safeY = y; }, observedResize: () => observe(),
     start: () => ids.start_button.emit('click'), muted: () => ids.play_muted.emit('click')};
 }
@@ -69,6 +69,21 @@ test('early lifecycle never calls C++; ready/start are separate; unavailable aud
   r.shell.ready(); assert.equal(r.shell.active, false);
   r.start(); assert.equal(r.shell.active, true);
   assert.equal(r.ids.overlay.style.display, 'none');
+});
+
+test('co-op recovery gate keeps trusted Resume covered until the relay is neutral', () => {
+  const r=runtime(); r.shell.ready(); r.start(); r.shell.pause('Connection interrupted');
+  // The production co-op object is installed on Module after shell creation.
+  r.ids.canvas.focus = () => {throw Error('A blocked Resume must not activate audio or input');};
+  // Supply the gate through the same Module used by the real embedding.
+  let paused=0;
+  r.module.supertuxCoop={canResume:()=> 'Waiting for the connection to recover.',onPause:()=>++paused};
+  r.shell.pause('Connection interrupted');assert.equal(paused,1);
+  r.start(); assert.equal(r.shell.active,false);
+  assert.equal(r.ids.status.textContent,'Waiting for the connection to recover.');
+  assert.equal(r.ids.overlay.style.display,'flex');
+  r.ids.canvas.focus=()=>{}; r.module.supertuxCoop.canResume=()=>true;
+  r.start(); assert.equal(r.shell.active,true);
 });
 
 test('visible viewport minus safe area uses integer CSS pixels; bursts/no-op/zero sizes do not reallocate', () => {

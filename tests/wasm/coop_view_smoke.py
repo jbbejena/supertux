@@ -22,6 +22,10 @@ async def run(args, url):
     html = urlopen(request, timeout=30).read().decode().replace('var Module = {','var Module = {\narguments:["--verbose","--developer"],',1)
     async with async_playwright() as p:
         launch = dict(args=['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader']) if args.browser=='chromium' else {}
+        if args.browser == 'chromium' and not args.gpu_compositing:
+            # Preserve real SDL/WebGL rendering while avoiding software-GPU
+            # compositor contention between the independent host/guest browsers.
+            launch['args'].append('--disable-gpu-compositing')
         if args.webkit_executable: launch['executable_path']=args.webkit_executable
         host_browser=await getattr(p,args.browser).launch(**launch)
         guest_browser=await getattr(p,args.browser).launch(**launch)
@@ -46,14 +50,58 @@ async def run(args, url):
         await host.locator('#coop_panel').evaluate('(e)=>e.open=true')
         await host.locator('#coop_create').click()
         await host.wait_for_function("document.querySelector('#coop_status').textContent.includes('Room ready')")
+        await host.evaluate('''() => {
+          const connection=Module.supertuxCoop.connection,message=connection.events.message;
+          connection.events.message=value=>{
+            message(value);
+            if(value.type==='peer' && value.connected){connection.events.message=message;window.dispatchEvent(new Event('blur'));}
+          };
+        }''')
         await guest.goto(await host.locator('#coop_view_link').get_attribute('href'))
         await guest.wait_for_function('supertuxGuest.state.connected',timeout=90000)
         await host.wait_for_function('Module.supertuxCoop.state.reserved===1')
+        await host.wait_for_function('!Module.supertuxShell.active && !Module.supertuxCoop.state.enabled')
+        await host.locator('#start_button').click()
+        await host.wait_for_function('Module.supertuxShell.active')
+        # SDL selects its focused window from the currently focused canvas.
+        # Pair our synthetic blur after trusted Resume has focused that canvas.
+        await host.evaluate("window.dispatchEvent(new Event('focus'))")
+        report['checks'].append('Blur between guest notification and native polling preserves the remote ownership command while retiring input; trusted Resume keeps Player 2 joined')
         await host.evaluate('''() => {
+          window.viewLifecycle=[];
+          const record=(type,detail)=>{
+            viewLifecycle.push({type,at:performance.now(),detail});
+            if(viewLifecycle.length>64)viewLifecycle.shift();
+          };
+          const connection=Module.supertuxCoop.connection,message=connection.events.message;
+          connection.events.message=value=>{
+            if(value.type==='connection')record('relay',value);
+            message(value);
+          };
+          const before=Module.supertuxCoop.beforeFrame;
+          Module.supertuxCoop.beforeFrame=gap=>{
+            if(gap>=750)record('native-gap',{gap,state:Module.supertuxCoop.state});
+            before(gap);
+          };
+          const pause=Module.supertuxShell.pause;
+          Module.supertuxShell.pause=reason=>{
+            record('shared-pause',{reason,state:Module.supertuxCoop.state});
+            pause(reason);
+          };
+          if(PerformanceObserver.supportedEntryTypes.includes('longtask'))
+            new PerformanceObserver(list=>{
+              for(const entry of list.getEntries())if(entry.duration>=500)
+                record('long-task',{start:entry.startTime,duration:entry.duration});
+            }).observe({type:'longtask'});
           window.lastViewPacket=null;const publish=Module.supertuxCoop.view;
           Module.supertuxCoop.view=frame=>{lastViewPacket=frame;publish(frame);};
           window.viewInputFrames=0;const status=Module.supertuxCoop.engineStatus;
-          Module.supertuxCoop.engineStatus=(...args)=>{++viewInputFrames;status(...args);};
+          Module.supertuxCoop.engineStatus=(...args)=>{
+            const previous=Module.supertuxCoop.state;
+            ++viewInputFrames;status(...args);
+            if(previous.generation!==args[2] || previous.enabled!==!!args[1])
+              record('input-generation',{previous,current:Module.supertuxCoop.state});
+          };
         }''')
         async def host_key(key):
             # Observe a native input update after each edge. Wall-clock presses
@@ -94,7 +142,10 @@ async def run(args, url):
             try:
                 await guest.wait_for_function('SupertuxView.playable && SupertuxView.state.drawn && ('+expression+')',timeout=timeout)
             except Exception:
-                print('VIEW_SAMPLE_FAILED',label,await guest.evaluate('({guest:supertuxGuest.state,view:SupertuxView.state,status:document.querySelector("#guest_status").textContent,viewStatus:document.querySelector("#view_status").textContent})'),await host.evaluate('({state:Module.supertuxCoop.state,status:document.querySelector("#coop_status").textContent,packet:window.lastViewPacket})'),flush=True)
+                diagnostic={'guest':await guest.evaluate('({guest:supertuxGuest.state,view:SupertuxView.state,status:document.querySelector("#guest_status").textContent,viewStatus:document.querySelector("#view_status").textContent})'),
+                            'host':await host.evaluate('({state:Module.supertuxCoop.state,active:Module.supertuxShell.active,status:document.querySelector("#coop_status").textContent,packet:window.lastViewPacket,lifecycle:window.viewLifecycle})')}
+                (args.output/'failure-state.json').write_text(json.dumps(diagnostic,indent=2)+'\n')
+                print('VIEW_SAMPLE_FAILED',label,diagnostic['host']['state'],diagnostic['host']['status'],flush=True)
                 await guest.screenshot(path=str(args.output/'sample-guest-failure.png'))
                 raise
             frame=await guest.evaluate('SupertuxView.state.drawn')
@@ -143,28 +194,32 @@ async def run(args, url):
         report['checks'].append('Host Pause freezes presentation and releases guest input; Resume requires neutral state with a fresh generation')
 
         async def script(command, active=True, paused=True):
-            await host.locator('#canvas').focus()
-            if paused:
-                await host_key('Escape')
-                await host.wait_for_function('!Module.supertuxCoop.state.enabled')
-            if callable(command): command=await command()
-            await host_key('Backquote')
-            await host.keyboard.type(command,delay=4);await host_key('Enter')
-            assert any('> '+command in line for line in logs[-30:]),logs[-10:]
-            await host_key('Backquote')
-            if active and paused: await host_key('Escape')
-            if active:
-                try:
+            try:
+                await host.locator('#canvas').focus()
+                if paused:
+                    await host_key('Escape')
+                    await host.wait_for_function('!Module.supertuxCoop.state.enabled')
+                if callable(command): command=await command()
+                await host_key('Backquote')
+                await host.keyboard.type(command,delay=4);await host_key('Enter')
+                assert any('> '+command in line for line in logs[-30:]),logs[-10:]
+                await host_key('Backquote')
+                if active and paused: await host_key('Escape')
+                if active:
                     await host.wait_for_function('Module.supertuxCoop.state.enabled')
                     # Resume reaches the host before its session/baseline can
                     # reach the guest. An input sent in that gap is correctly
                     # ignored; drive the next fixture only after presentation.
                     await guest.wait_for_function('SupertuxView.playable && supertuxGuest.state.mask===0')
-                except Exception:
-                    print('VIEW_SCRIPT_FAILED',command,await guest.evaluate('({guest:supertuxGuest.state,view:SupertuxView.state,status:document.querySelector("#guest_status").textContent,viewStatus:document.querySelector("#view_status").textContent})'),await host.evaluate('({state:Module.supertuxCoop.state,status:document.querySelector("#coop_status").textContent,packet:window.lastViewPacket})'),flush=True)
-                    await host.locator('#canvas').screenshot(path=str(args.output/'script-host-failure.png'))
-                    await guest.screenshot(path=str(args.output/'script-guest-failure.png'))
-                    raise
+            except Exception:
+                diagnostic={'command':str(command),
+                    'host':await host.evaluate('({state:Module.supertuxCoop.state,active:Module.supertuxShell.active,status:document.querySelector("#coop_status").textContent,lifecycle:viewLifecycle})'),
+                    'guest':await guest.evaluate('({state:supertuxGuest.state,playable:SupertuxView.playable,status:document.querySelector("#guest_status").textContent})')}
+                (args.output/'script-lifecycle-failure.json').write_text(json.dumps(diagnostic,indent=2)+'\n')
+                print('VIEW_SCRIPT_FAILED',str(command),diagnostic['host']['state'],diagnostic['host']['status'],flush=True)
+                await host.locator('#canvas').screenshot(path=str(args.output/'script-host-failure.png'))
+                await guest.screenshot(path=str(args.output/'script-guest-failure.png'))
+                raise
         await script('sector.Tux2.kill(true);')
         await sample('death',"SupertuxView.state.drawn.players[1].dead>0")
         # Press Action only after native death is complete. A held Action first
@@ -242,6 +297,28 @@ async def run(args, url):
         report['metrics']['campaign_interpolated_draws']=len(smooth)
         report['checks'].append('Compiled native campaign geometry renders changing intermediate player quads between the same complete snapshots; animation stays host-authoritative')
         await script('sector.Tux.set_is_intentionally_safe(true);sector.Tux2.set_is_intentionally_safe(true);')
+        # Deliberately block the authoritative browser thread while P2 holds
+        # movement. Recovery must stop simulation before queued input is read.
+        old_generation=await host.evaluate('Module.supertuxCoop.state.generation')
+        await guest.keyboard.down('ArrowRight')
+        await host.wait_for_function('Module.supertuxCoop.state.sequence>0')
+        await host.evaluate('''() => {const end=performance.now()+3200;while(performance.now()<end){};}''')
+        await host.wait_for_function('!Module.supertuxShell.active && !Module.supertuxCoop.state.enabled && !Module.supertuxCoop.state.relayInterrupted')
+        await guest.wait_for_function('!SupertuxView.playable && supertuxGuest.state.mask===0')
+        assert await host.evaluate('Module.supertuxCoop.connection.ready')
+        assert await guest.evaluate('supertuxGuest.state.connected')
+        held=await host.evaluate('JSON.stringify(lastViewPacket.players)')
+        await host.wait_for_timeout(600)
+        assert await host.evaluate('JSON.stringify(lastViewPacket.players)')==held
+        assert await host.evaluate('Module.supertuxCoop.state.generation')>old_generation
+        assert not await host.evaluate('Module.supertuxShell.active')
+        await guest.keyboard.up('ArrowRight')
+        await host.locator('#start_button').click()
+        await guest.wait_for_function('SupertuxView.playable && supertuxGuest.state.mask===0')
+        recovered=await sample('stall-recovered')
+        assert recovered['generation']==await host.evaluate('Module.supertuxCoop.state.generation')
+        assert recovered['epoch']==campaign['epoch']
+        report['checks'].append('A deliberate 3.2-second host stall preserves the authenticated room, freezes simulation and clears held input; trusted Resume obtains a fresh current-generation baseline')
         state=await sample('campaign-objects')
         coin=next(e for e in state['world']['entities'] if e[1]=='coin')
         coins=state['world']['coins']
@@ -342,10 +419,38 @@ async def run(args, url):
 
         await guest.keyboard.down('ArrowRight')
         await guest.evaluate("Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'))")
-        await host.wait_for_function('Module.supertuxCoop.state.reserved===-1 && !Module.supertuxCoop.state.enabled')
+        await host.wait_for_function('Module.supertuxCoop.state.reserved===-1 && !Module.supertuxCoop.state.enabled && !Module.supertuxShell.active')
         assert not await guest.evaluate('SupertuxView.playable')
         assert await guest.evaluate('supertuxGuest.state.mask')==0
-        report['checks'].append('Guest background/disconnect clears controls, image history and authority; host retains its game and requires title-screen rejoin')
+        await host.locator('#start_button').click()
+        assert not await host.evaluate('Module.supertuxShell.active')
+        assert await host.locator('#coop_restart').is_visible()
+        report['checks'].append('Guest background/disconnect clears controls and image history, pauses the host and blocks Resume; the title-screen restart action is visible')
+        # The storage API resolves false on quota/unavailable storage. Do not
+        # mistake that completed attempt for a durable save and reload the page.
+        saved_config=await host.evaluate('''() => {
+          const fs=Module.FS,root=Module.supertuxStorage.root;
+          fs.writeFile(root+'recovery-progress-fixture.txt','private-coop-progress');
+          window.recoveryRestartMarker=true;
+          window.recoverySave=window.supertux_saveFiles;
+          window.supertux_saveFiles=async()=>false;
+          return fs.readFile(root+'config',{encoding:'utf8'});
+        }''')
+        await host.locator('#coop_restart').click()
+        await host.wait_for_function("document.querySelector('#status').textContent.includes('could not be saved')")
+        assert await host.evaluate('Module.supertuxCoop.state.lost && !Module.supertuxShell.active')
+        assert not await host.locator('#coop_restart').is_disabled()
+        await host.evaluate('window.supertux_saveFiles=window.recoverySave')
+        await host.locator('#coop_restart').click()
+        await host.wait_for_function('!window.recoveryRestartMarker && window.Module?.supertuxReady && Module.supertuxStorage.state === "indexeddb"',timeout=180000)
+        preserved=await host.evaluate('''() => {
+          const fs=Module.FS,root=Module.supertuxStorage.root;
+          return {progress:fs.readFile(root+'recovery-progress-fixture.txt',{encoding:'utf8'}),
+                  config:fs.readFile(root+'config',{encoding:'utf8'})};
+        }''')
+        assert preserved['progress']=='private-coop-progress'
+        assert preserved['config']==saved_config
+        report['checks'].append('Failed save keeps the host paused without reloading; retry durably flushes settings/progression fixture bytes and hydrates them after title restart')
         for line in logs:
             if re.search(r'undefined symbol|Aborted\(|\[FATAL\]|runtime error:|missing function|AN ERROR HAS OCCURRED|Error waking VM|Squirrel exception:|Shared view artwork missing:|Co-op presentation rejected|Co-op presentation exceeded',line):
                 if not (args.record_known_ub and any(re.search(pattern,line) for pattern in KNOWN_UPSTREAM_UB)):errors.append(line)

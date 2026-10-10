@@ -6,6 +6,13 @@ the original **Welcome to Antarctica**. The host owns simulation, audio,
 menus and saves; the guest renders authoritative state and controls Player 2.
 The existing shared camera keeps both living players visible.
 
+Phase 8B is merged through PR #16 at
+`0a240fc3445efd08610b9d66bf6b647a512fbfca`. Its measured heartbeat failures
+motivate the focused interruption work in
+[PRIVATE_COOP_RECOVERY.md](PRIVATE_COOP_RECOVERY.md), ahead of the 8C room UI.
+This covers neutral pause and bounded socket recovery; replay/lobby polish and
+invitation versus active-session expiry still remain in 8D.
+
 ## Order of work
 
 | Stage | Deliverable | Acceptance |

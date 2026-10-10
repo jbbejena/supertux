@@ -5,11 +5,11 @@ export const ROOM_MS = 15 * 60 * 1000;
 const TOKEN = /^[a-f0-9]{64}$/;
 const BUILD = /^[a-f0-9]{64}$/;
 const UINT = value => Number.isInteger(value) && value > 0 && value < 0x80000000;
-// Synchronous WASM level loading can block the host's browser event loop.
-// Only an already neutral host session gets loading grace; active play and
-// guests retain the short watchdog, independently of the C++ 750 ms watchdog.
-const idleLimit = info => info.role === 'host' && info.session?.enabled === false ? 15000 : 2500;
-const FIELDS = {hello: ['type','protocol','build','view'], ping: ['type'], seen: ['type'], session: ['type','generation','enabled'], ack: ['type','sequence'], input: ['type','generation','sequence','mask'], 'view-ready':['type','session','epoch'], result:['type','session','epoch','generation','win'], view: ['type','session','epoch','sequence','generation','time','scene','camera','players','world']};
+// A missed heartbeat freezes input first. Keep the authenticated sockets for
+// a bounded recovery window, never an unbounded backlog or automatic resume.
+const STALE_MS = 2500, RECOVERY_MS = 15000;
+const idleLimit = info => info.role === 'host' && !info.session?.enabled ? RECOVERY_MS : STALE_MS;
+const FIELDS = {hello: ['type','protocol','build','view'], ping: ['type'], seen: ['type'], session: ['type','generation','enabled'], ack: ['type','sequence'], input: ['type','generation','sequence','mask'], 'view-ready':['type','session','epoch','generation'], result:['type','session','epoch','generation','win'], view: ['type','session','epoch','sequence','generation','time','scene','camera','players','world']};
 const json = (body, status = 200) => new Response(JSON.stringify(body), {
   status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
 });
@@ -88,7 +88,7 @@ export class CoopRoom {
     if ((info.inFlight || 0) >= 32) {
       // These are latest-state notifications, never gameplay edges. Keep one
       // value per type while the receiver returns credit, not an event backlog.
-      if (['session', 'ack', 'pong', 'view', 'result'].includes(value.type)) {
+      if (['connection', 'session', 'ack', 'pong', 'view', 'result'].includes(value.type)) {
         info.pending ||= {};
         if (value.type === 'view') {
           // Cloudflare limits WebSocket attachments to 2 KiB. Large complete
@@ -108,7 +108,7 @@ export class CoopRoom {
     catch { try { socket.close(1011, 'Relay send failed'); } catch {} return false; }
   }
   flush_status(socket) {
-    for (const type of ['session', 'ack', 'pong', 'view', 'result']) {
+    for (const type of ['connection', 'session', 'ack', 'pong', 'view', 'result']) {
       const info = socket.deserializeAttachment();
       if ((info.inFlight || 0) >= 32) break;
       const marker = info.pending?.[type];
@@ -123,12 +123,43 @@ export class CoopRoom {
   peer(role) { return this.state.getWebSockets(role)[0]; }
   close(socket, code, reason) { this.pendingViews.delete(socket); try { socket.close(code, reason); } catch {} }
 
+  async interrupt(room) {
+    if (room.interruption) return;
+    room.interruption = {started: Date.now(), generation: this.peer('host')?.deserializeAttachment().session?.generation || 0};
+    await this.state.storage.put('room', room);
+    for (const socket of this.state.getWebSockets()) {
+      if (socket.deserializeAttachment().hello) this.send(socket, {type:'connection',interrupted:true});
+    }
+  }
+
+  async recover(room) {
+    if (!room.interruption) return;
+    const host = this.peer('host')?.deserializeAttachment(), guest = this.peer('guest')?.deserializeAttachment();
+    // Only a new, explicitly neutral native generation can retire old inputs.
+    if (host?.hello && guest?.hello && host.session?.enabled === false &&
+        host.session.generation !== room.interruption.generation &&
+        Date.now() - host.last < STALE_MS && Date.now() - guest.last < STALE_MS) {
+      delete room.interruption;
+      await this.state.storage.put('room', room);
+      for (const socket of this.state.getWebSockets()) this.send(socket, {type:'connection',interrupted:false});
+    }
+  }
+
   async webSocketMessage(socket, raw) {
     const room = await this.state.storage.get('room');
     const info = socket.deserializeAttachment();
     if (!room || Date.now() >= room.expires) { this.close(socket, 1008, 'Room expired'); return; }
     if (typeof raw !== 'string' || new TextEncoder().encode(raw).length > 65536) { this.close(socket, 1009, 'Message too large'); return; }
     const now = Date.now();
+    for (const peer of this.state.getWebSockets()) {
+      const value = peer.deserializeAttachment();
+      if ((value.hello && now - value.last >= RECOVERY_MS) || (room.interruption && now - room.interruption.started >= RECOVERY_MS)) {
+        await this.webSocketClose(peer, 1001, 'Connection timed out'); return;
+      }
+    }
+    // Alarms may race a returning socket. Apply the same barrier before any
+    // delayed gameplay packet is forwarded, independently of alarm timing.
+    if (this.state.getWebSockets().some(peer => {const value = peer.deserializeAttachment(); return value.hello && now - value.last >= idleLimit(value);})) await this.interrupt(room);
     if (now - info.rateStart >= 1000) { info.rateStart = now; info.count = 0; }
     let message;
     try { message = JSON.parse(raw); } catch { this.close(socket, 1008, 'Malformed message'); return; }
@@ -169,13 +200,13 @@ export class CoopRoom {
       if (message.generation === info.session?.generation && (!previous || message.session > previous.session ||
           (message.session === previous.session && (message.epoch > previous.epoch ||
           (message.epoch === previous.epoch && message.sequence > previous.sequence && message.time >= previous.time))))) {
-        info.viewOrder = {session:message.session,epoch:message.epoch,sequence:message.sequence,time:message.time};
+        info.viewOrder = {session:message.session,epoch:message.epoch,generation:message.generation,sequence:message.sequence,time:message.time};
         const peer = this.peer('guest');
         if (peer?.deserializeAttachment().hello && peer.deserializeAttachment().view) this.send(peer,message);
       }
-    } else if (info.role === 'guest' && info.view && message.type === 'view-ready' && UINT(message.session) && UINT(message.epoch)) {
+    } else if (info.role === 'guest' && info.view && message.type === 'view-ready' && UINT(message.session) && UINT(message.epoch) && UINT(message.generation)) {
       const host = this.peer('host'), order = host?.deserializeAttachment().viewOrder;
-      if (order && order.session === message.session && order.epoch === message.epoch) this.send(host,message);
+      if (order && order.session === message.session && order.epoch === message.epoch && order.generation === message.generation) this.send(host,message);
     } else if (info.role === 'host' && message.type === 'result' && UINT(message.session) && UINT(message.epoch) &&
                message.generation === info.session?.generation && typeof message.win === 'boolean') {
       const order = info.viewOrder, peer = this.peer('guest');
@@ -190,16 +221,23 @@ export class CoopRoom {
     } else if (info.role === 'guest' && message.type === 'input' && UINT(message.generation) && UINT(message.sequence) &&
                Number.isInteger(message.mask) && message.mask >= 0 && message.mask <= 127) {
       const host = this.peer('host'), session = host?.deserializeAttachment().session;
-      if (host?.deserializeAttachment().hello && session?.enabled && session.generation === message.generation &&
+      if (!room.interruption && host?.deserializeAttachment().hello && session?.enabled && session.generation === message.generation &&
           (info.generation !== message.generation || message.sequence > info.sequence)) {
-        info.generation = message.generation; info.sequence = message.sequence;
-        this.send(host, {type: 'input', generation: message.generation, sequence: message.sequence, mask: message.mask});
+        // A blocked host can fill its strict receive window before the next
+        // heartbeat alarm. Freeze and retire input rather than destroy the
+        // authenticated room; no extra edge or backlog is stored.
+        if ((host.deserializeAttachment().inFlight || 0) >= 32) await this.interrupt(room);
+        else {
+          info.generation = message.generation; info.sequence = message.sequence;
+          this.send(host, {type: 'input', generation: message.generation, sequence: message.sequence, mask: message.mask});
+        }
       }
     } else { this.close(socket, 1008, 'Message not allowed for role'); return; }
     info.last = now;
     info.inFlight = socket.deserializeAttachment().inFlight;
     info.pending = socket.deserializeAttachment().pending;
     socket.serializeAttachment(info);
+    await this.recover(room);
     if (message.type === 'hello') {
       const other = this.peer(info.role === 'host' ? 'guest' : 'host');
       if (other?.deserializeAttachment().hello) {
@@ -231,8 +269,9 @@ export class CoopRoom {
     let next = room.expires;
     for (const socket of this.state.getWebSockets()) {
       const info = socket.deserializeAttachment();
-      next = Math.min(next, info.hello ? info.last + idleLimit(info) : info.opened + 5000);
+      next = Math.min(next, info.hello ? info.last + (room.interruption ? RECOVERY_MS : idleLimit(info)) : info.opened + 5000);
     }
+    if (room.interruption) next = Math.min(next, room.interruption.started + RECOVERY_MS);
     await this.state.storage.setAlarm(Math.max(Date.now() + 100, next));
   }
   async alarm() {
@@ -244,9 +283,10 @@ export class CoopRoom {
     }
     for (const socket of this.state.getWebSockets()) {
       const info = socket.deserializeAttachment();
-      if ((!info.hello && Date.now() - info.opened >= 5000) || (info.hello && Date.now() - info.last >= idleLimit(info))) {
+      if ((!info.hello && Date.now() - info.opened >= 5000) || (info.hello && Date.now() - info.last >= RECOVERY_MS) ||
+          (room.interruption && Date.now() - room.interruption.started >= RECOVERY_MS)) {
         await this.webSocketClose(socket, 1001, 'Connection timed out');
-      }
+      } else if (info.hello && Date.now() - info.last >= idleLimit(info)) await this.interrupt(room);
     }
     if (await this.state.storage.get('room')) await this.arm(room);
   }

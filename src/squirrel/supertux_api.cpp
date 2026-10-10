@@ -26,6 +26,7 @@
 #include "object/camera.hpp"
 #include "object/player.hpp"
 #include "physfs/ifile_stream.hpp"
+#include "squirrel/squirrel_random.hpp"
 #include "squirrel/squirrel_virtual_machine.hpp"
 #include "supertux/console.hpp"
 #include "supertux/debug.hpp"
@@ -570,9 +571,9 @@ static void warp(float offset_x, float offset_y)
  * @scripting
  * @description Returns a random integer.
  */
-static int rand()
+static SQInteger rand(HSQUIRRELVM vm)
 {
-  return gameRandom.rand();
+  return squirrel_random(vm, gameRandom);
 }
 
 /**

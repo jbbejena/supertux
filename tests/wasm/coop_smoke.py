@@ -33,6 +33,10 @@ async def run(args, url):
     html = urlopen(url+'index.html').read().decode().replace('var Module = {', 'var Module = {\narguments:["--verbose","--developer"],', 1)
     async with async_playwright() as p:
         launch = dict(args=['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader']) if args.browser == 'chromium' else {}
+        if args.browser == 'chromium' and not args.gpu_compositing:
+            # Two SwiftShader browsers otherwise contend on GPU context switches
+            # and stall the host command buffer. Keep SDL/WebGL drawing enabled.
+            launch['args'].append('--disable-gpu-compositing')
         if args.webkit_executable: launch['executable_path'] = args.webkit_executable
         browser = await getattr(p,args.browser).launch(**launch)
         guest_browser = await getattr(p,args.browser).launch(**launch) if not args.local_only else None
@@ -298,6 +302,13 @@ async def run(args, url):
         for _ in range(600):
             if any('Setting status: In worldmap' in line for line in logs[end_start:]): break
             await host.wait_for_timeout(100)
+        if not any('Setting status: In worldmap' in line for line in logs[end_start:]):
+            diagnostic={'host':await host.evaluate('''() => ({active:Module.supertuxShell.active,
+                state:Module.supertuxCoop.state,connected:!!Module.supertuxCoop.connection?.ready,
+                status:document.querySelector('#coop_status').textContent})''')}
+            if guest:
+                diagnostic['guest']=await guest.evaluate("({state:supertuxGuest.state,status:document.querySelector('#guest_status').textContent})")
+            (args.output/'completion-failure-state.json').write_text(json.dumps(diagnostic,indent=2))
         assert any('Setting status: In worldmap' in line for line in logs[end_start:]),logs[-6:]
         await host.wait_for_timeout(500)
         if guest: assert not await host.evaluate('Module.supertuxCoop.state.enabled')
@@ -363,16 +374,26 @@ async def run(args, url):
         if guest:
             await p2('right',True);await sample('before-disconnect',lambda s:s[1]['right'])
             await guest.evaluate("supertuxGuest.connection.close('Acceptance test disconnect')")
-            await host.wait_for_function('Module.supertuxCoop.state.reserved===-1')
-            await sample('disconnect-neutral',lambda s:not s[1]['right'])
+            await host.wait_for_function('Module.supertuxCoop.state.reserved===-1 && !Module.supertuxCoop.state.enabled && !Module.supertuxShell.active')
+            assert await host.evaluate('Module.supertuxCoop.state.sequence')==0
             await guest.locator('#guest_join').click()
             await host.wait_for_function('Module.supertuxCoop.state.joinRejected')
             assert not await guest.evaluate('supertuxGuest.state.enabled')
-            report['checks'].append('Held-button socket disconnect clears P2; in-level rejoin is rejected instead of reclaiming a live player')
-        await script('Level.finish(true);',paused=False)
-        await host.wait_for_timeout(1800)
+            report['checks'].append('Held-button disconnect neutralizes P2 and pauses simulation; in-level rejoin is rejected instead of reclaiming a live player')
+        else:
+            await script('Level.finish(true);',paused=False)
+            await host.wait_for_timeout(1800)
         if guest:
-            await guest.locator('#guest_join').click()
+            async with host.expect_navigation(wait_until='domcontentloaded'):
+                await host.locator('#coop_restart').click()
+            await host.wait_for_function('Module.supertuxReady',timeout=180000)
+            await host.locator('#start_button').click()
+            await host.wait_for_function("document.querySelector('#output').textContent.includes('Setting status: In main menu')")
+            await host.locator('#coop_panel').evaluate('(e)=>e.open=true')
+            await host.locator('#coop_create').click()
+            await host.wait_for_function("document.querySelector('#coop_status').textContent.includes('Room ready')")
+            await guest.goto(await host.locator('#coop_link').get_attribute('href'))
+            await guest.wait_for_function('window.supertuxGuest?.state.connected')
             await host.wait_for_function('Module.supertuxCoop.state.reserved===1')
             await host.locator('#coop_panel').evaluate('(e)=>e.open=true')
             await host.locator('#coop_antarctica').click()
@@ -384,10 +405,8 @@ async def run(args, url):
             await p2('right',False);await p2('right',True)
             await sample('rejoin-fresh-input',lambda s:s[1]['right'] and not s[0]['right'])
             await guest.evaluate("Object.defineProperty(document,'hidden',{configurable:true,get:()=>true});document.dispatchEvent(new Event('visibilitychange'))")
-            await host.wait_for_function('Module.supertuxCoop.state.reserved===-1')
-            await sample('guest-background-neutral',lambda s:not s[1]['right'])
-            await script('Level.finish(true);',paused=False);await host.wait_for_timeout(1600)
-            report['checks'].append('Return to title, explicit rejoin and new level accept fresh P2 input; guest background closes socket and neutralizes held input')
+            await host.wait_for_function('Module.supertuxCoop.state.reserved===-1 && !Module.supertuxShell.active && !Module.supertuxCoop.state.enabled')
+            report['checks'].append('Return to title preserves saves; a new invitation opened in the same guest tab retires old credentials and accepts fresh P2 input; guest background closes its socket and pauses the host')
 
         # Verify the existing persistence path for both ordinary local co-op
         # and transient remote membership, including a real page reload.
@@ -425,7 +444,9 @@ async def run(args, url):
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('build',type=Path);parser.add_argument('--output',type=Path,required=True)
     parser.add_argument('--browser',choices=['chromium','webkit'],default='chromium');parser.add_argument('--webkit-executable')
-    parser.add_argument('--url');parser.add_argument('--local-only',action='store_true');parser.add_argument('--record-known-ub',action='store_true');args=parser.parse_args()
+    parser.add_argument('--url');parser.add_argument('--local-only',action='store_true');parser.add_argument('--record-known-ub',action='store_true')
+    parser.add_argument('--gpu-compositing',action='store_true',help='Reproduce the original Chromium GPU compositor mode (requires more software-renderer CPU headroom)')
+    args=parser.parse_args()
     args.output.mkdir(parents=True,exist_ok=True);relay=None;server=None
     if args.url: url=args.url.rstrip('/')+'/'
     elif args.local_only:

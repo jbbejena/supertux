@@ -17,6 +17,7 @@ class SelectionTests(unittest.TestCase):
             ('tools/web/package_assets.py', {'tests', 'web', 'debug'}),
             ('tests/web/test_packaging.py', {'tests', 'web'}),
             ('src/audio/sound_manager.cpp', {'tests', 'lint', 'linux', 'web', 'debug'}),
+            ('src/squirrel/squirrel_scheduler.cpp', {'tests', 'lint', 'linux', 'web', 'debug'}),
             ('src/object/player.cpp', {'tests', 'lint', 'linux', 'web'}),
             ('vcpkg.json', set(selection.select([], True))),
             ('mk/cmake/SuperTux/Emscripten.cmake', {'tests', 'web', 'debug', 'linux'}),

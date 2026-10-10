@@ -15,7 +15,7 @@
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // Export functions for emscripten
-// If you add functions here, make sure to make CMakeLists.txt export them!
+// Export functions through EMSCRIPTEN_KEEPALIVE or CMakeLists.txt.
 #ifdef __EMSCRIPTEN__
 
 #include <emscripten.h>
@@ -36,6 +36,7 @@ void set_browser_suspended(int suspended);
 void reset_browser_input();
 void set_browser_touch_available(int available);
 void cancel_browser_touch(int pointer_id);
+int get_browser_menu_state();
 void init_emscripten();
 void onDownloadProgress(intptr_t address, int id, int loaded, int total);
 void onDownloadFinished(intptr_t address, int id, const char* data);
@@ -64,6 +65,20 @@ void
 reset_browser_input()
 {
   ScreenManager::current()->reset_browser_input();
+}
+
+EMSCRIPTEN_KEEPALIVE
+int
+get_browser_menu_state()
+{
+  // Read-only diagnostics: 1 = menu, 2 = transition, 4 = current/pending dialog.
+  // A controller update alone does not mean a new menu accepts pointer input:
+  // MenuManager::event ignores it until draw() finishes the transition.
+  const auto manager = MenuManager::current();
+  if (!manager) return 0;
+  return (manager->is_active() ? 1 : 0) |
+         (manager->is_transition_active() ? 2 : 0) |
+         (manager->has_dialog() ? 4 : 0);
 }
 
 void

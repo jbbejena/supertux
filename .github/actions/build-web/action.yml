@@ -51,7 +51,7 @@ runs:
                        -DCMAKE_TOOLCHAIN_FILE="$HOME/wasm-vcpkg/scripts/buildsystems/vcpkg.cmake" \
                        -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE="$HOME/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake" \
                        -DVCPKG_TARGET_TRIPLET=wasm32-emscripten -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
-                       -DVCPKG_MANIFEST_NO_DEFAULT_FEATURES=ON
+                       -DVCPKG_MANIFEST_NO_DEFAULT_FEATURES=ON -DBUILD_TESTING=ON
     shell: bash
   - name: Controller source ownership checks
     run: |
@@ -75,6 +75,9 @@ runs:
     run: |
       source ~/emsdk/emsdk_env.sh
       cmake --build . --parallel 4 2>&1 | tee build.log
+    shell: bash
+  - name: Script scheduler reentrancy regression
+    run: node build/tests/unit/SquirrelSchedulerTest.js
     shell: bash
   - name: Setup files for upload
     working-directory: build

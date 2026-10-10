@@ -1,0 +1,114 @@
+{
+  "patchBaseCommit": "0077b1cb53a3865229432d67fbc2692234a5e009",
+  "webIntegrationBranch": "mobile-web-audit",
+  "measurementDate": "2026-10-10",
+  "browser": "Chromium 151.0.7922.34",
+  "viewport": {
+    "width": 844,
+    "height": 390,
+    "deviceScaleFactor": 1,
+    "hasTouch": true
+  },
+  "toolchain": {
+    "emscripten": "6.0.11",
+    "vcpkg": "c748cb44f2a435fcf015c35225c9d5545fe0021c"
+  },
+  "graphics": "Original ANGLE/SwiftShader GPU compositor; actual SDL/WebGL rendering retained",
+  "delivery": "Unthrottled local HTTP; fresh browser contexts/storage",
+  "physicalDeviceTested": false,
+  "priorCI": {
+    "run": 38029999586,
+    "headSha": "0077b1cb53a3865229432d67fbc2692234a5e009",
+    "conclusion": "failure",
+    "release": "success",
+    "debug": "failure: touch restart-before-cancel before co-op validation",
+    "nativeLinux": "success",
+    "lintFocused": "success",
+    "aggregate": "failure",
+    "reruns": 0,
+    "failedDebugArtifact": 11662032866,
+    "nativeEventTraceCaptured": false,
+    "unchangedLocalDebugTouch": {
+      "outcome": "passed",
+      "checks": 10
+    }
+  },
+  "controlledEarlyTap": {
+    "runtime": "52d8bf370bee4b97b1a943beec695274fb13b518 plus isolated read-only MenuManager event logging",
+    "injection": "DOM Pointer Events through actual SDL browser handlers; press during transition, release after completion",
+    "outcome": "Expected 2-second menu-close assertion failure; Restart remains selected; press ignored",
+    "events": [
+      {
+        "t": 72494.39999997616,
+        "type": 1025,
+        "transition": true,
+        "menu": true,
+        "item": 0,
+        "nativeTime": 27.14930534362793
+      },
+      {
+        "t": 73465,
+        "type": 1026,
+        "transition": false,
+        "menu": true,
+        "item": 1,
+        "nativeTime": 28.11990737915039
+      }
+    ],
+    "nativeBehaviorChanged": false,
+    "validityLimit": "Reproduces mechanism and screenshot symptom; exact failed CI event timing unavailable. Diagnostic timing is not a performance measurement."
+  },
+  "correction": {
+    "readOnlyMenuState": true,
+    "readinessDeadlineMs": 2000,
+    "spawnStateDeadlineMs": 2000,
+    "touchDurationsChanged": false,
+    "repeatTapsAdded": false,
+    "nativeMenuBehaviorChanged": false,
+    "existingAssertionsPreserved": true,
+    "clearedStorageOrSaves": false,
+    "compositorSettingsChanged": false
+  },
+  "candidateBuilds": {
+    "debug": "passed",
+    "release": "passed",
+    "nativeLinux": "passed (GCC Debug)"
+  },
+  "candidateTouchSuites": {
+    "chromiumDebug": {
+      "outcome": "passed",
+      "checks": 11,
+      "errors": [],
+      "knownSanitizerSites": 5,
+      "knownSanitizerAnnotations": 6
+    },
+    "chromiumRelease": {
+      "outcome": "passed",
+      "checks": 11,
+      "errors": []
+    },
+    "webkitRelease": {
+      "outcome": "passed",
+      "checks": 11,
+      "errors": [],
+      "browser": "26.5",
+      "touchInjection": "DOM Pointer Events through SDL3; native Start tap"
+    }
+  },
+  "focusedTests": {
+    "python": 22,
+    "javascript": 86,
+    "actionlint": "passed",
+    "cppcheck": "passed, complete repository command, 2.22.0",
+    "nativeCTest": 5
+  },
+  "candidateCI": "See https://github.com/jbbejena/supertux/pull/17/checks for the final source-specific revision; local results do not establish CI success.",
+  "productionDeployed": false,
+  "stagingRepublished": false,
+  "excludedDiagnostics": [
+    "Initial incomplete/overlapping diagnostics",
+    "Unsupported insert_text observer attempt",
+    "Simplified cycle probe without spawn verification"
+  ],
+  "localSourceIdentity": "Working-tree patch based on 0077b1cb53a3865229432d67fbc2692234a5e009; exact committed revision is validated separately by GitHub CI."
+}

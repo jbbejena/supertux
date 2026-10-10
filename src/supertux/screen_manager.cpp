@@ -770,6 +770,10 @@ ScreenManager::handle_screen_switch()
 void ScreenManager::loop_iter()
 {
 #ifdef __EMSCRIPTEN__
+  // Check at the native frame boundary, before queued remote edges receive a
+  // new timestamp and before a catch-up physics step after a browser stall.
+  const auto frame_gap = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - last_time).count();
+  EM_ASM({ Module.supertuxCoop?.beforeFrame($0); }, frame_gap);
   if (m_browser_suspended)
   {
     last_time = std::chrono::steady_clock::now();
@@ -839,6 +843,13 @@ void ScreenManager::loop_iter()
     float dtime = seconds_per_step * m_speed * speed_multiplier;
     g_game_time += dtime;
     process_events();
+#ifdef __EMSCRIPTEN__
+    if (m_browser_suspended)
+    {
+      elapsed_time = 0.0f;
+      return;
+    }
+#endif
     update_gamelogic(dtime);
     elapsed_time -= seconds_per_step;
   }

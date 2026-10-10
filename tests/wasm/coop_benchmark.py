@@ -94,7 +94,14 @@ ATTACH_OBSERVER = r'''() => {
 }'''
 
 HOST_OBSERVER = r'''() => {
-  const state=window.hostBenchmark={active:false, intervals:[], nativeIntervals:[], buffered:0}, connection=Module.supertuxCoop.connection;
+  const state=window.hostBenchmark={active:false, intervals:[], nativeIntervals:[], buffered:0,
+    longTasks:[],longTasksSupported:PerformanceObserver.supportedEntryTypes.includes('longtask')}, connection=Module.supertuxCoop.connection;
+  if(state.longTasksSupported)new PerformanceObserver(list=>{
+    if(state.active)for(const entry of list.getEntries()){
+      state.longTasks.push({start:entry.startTime,duration:entry.duration});
+      if(state.longTasks.length>64)state.longTasks.shift();
+    }
+  }).observe({type:'longtask'});
   const send=connection.send.bind(connection);
   connection.send=value=>{const result=send(value);
     if(state.active)state.buffered=Math.max(state.buffered,connection.socket.bufferedAmount);return result;};
@@ -199,6 +206,19 @@ async def measure_trial(args,url,index,html,hc,gc,version):
     errors, logs = [], []
     result = dict(run=index+1, browser=version, loading={}, http={}, observations={}, errors=errors)
     host=guest=None
+    profiler=None
+    async def stop_profile():
+        nonlocal profiler
+        if profiler is None:return
+        profile=(await profiler.send('Profiler.stop'))['profile'];profiler=None
+        (args.output/f'run-{index+1}-host.cpu-profile.json').write_text(json.dumps(profile)+'\n')
+        nodes={node['id']:node['callFrame'] for node in profile['nodes']}
+        costs={}
+        for node,delta in zip(profile.get('samples',[]),profile.get('timeDeltas',[])):
+            frame=nodes[node];name=frame['functionName'] or '(anonymous)'
+            costs[name]=costs.get(name,0)+delta
+        result['host_cpu_profile']={'duration_ms':(profile['endTime']-profile['startTime'])/1000,
+            'sampling_interval_us':1000,'top_self_ms':sorted(((name,cost/1000) for name,cost in costs.items()),key=lambda value:value[1],reverse=True)[:20]}
     stage='boot'
     def console(message):
         line=redact(message.text); logs.append(line)
@@ -251,6 +271,9 @@ async def measure_trial(args,url,index,html,hc,gc,version):
         await cold_guest.close()
         await boot_host(True)
         guest=await boot_guest('warm')
+        if args.profile_host:
+            profiler=await hc.new_cdp_session(host)
+            await profiler.send('Profiler.enable');await profiler.send('Profiler.setSamplingInterval',{'interval':1000});await profiler.send('Profiler.start')
         result['guest_loaded_images']=await guest.evaluate('SupertuxView.state.loaded')
         await guest.evaluate(ATTACH_OBSERVER)
         await host.evaluate('''() => {window.benchmarkInputFrames=0;const status=Module.supertuxCoop.engineStatus;
@@ -300,14 +323,18 @@ async def measure_trial(args,url,index,html,hc,gc,version):
         result['observations']=await guest.evaluate('coopBenchmark.finish()')
         host_data=await host.evaluate('() => {hostBenchmark.active=false;return hostBenchmark}')
         result['observations'].update(host_raf_interval_ms=host_data['intervals'],
-            host_native_input_update_interval_ms=host_data['nativeIntervals'],max_host_buffered_bytes=host_data['buffered'])
+            host_native_input_update_interval_ms=host_data['nativeIntervals'],max_host_buffered_bytes=host_data['buffered'],
+            host_long_tasks=host_data['longTasks'],host_long_tasks_supported=host_data['longTasksSupported'])
         assert len(result['observations']['input_to_first_frame_ms'])==args.samples
         assert len(result['observations']['input_to_first_draw_ms'])==args.samples
         assert result['observations']['largest_view_bytes']<=65536
         result['known_upstream_ub']=[line for line in logs if 'runtime error:' in line and any(re.search(p,line) for p in KNOWN_UPSTREAM_UB)]
         assert not errors, errors
+        await stop_profile()
         return result
     except Exception as error:
+        try:await stop_profile()
+        except Exception as profile_error:result['profile_error']=redact(profile_error)
         result['failure']=redact(error)
         result['failure_stage']=stage
         for role,page in (('host',host),('guest',guest)):
@@ -326,7 +353,8 @@ async def measure_trial(args,url,index,html,hc,gc,version):
                     settled:window.benchmarkSettled,measurements:window.coopBenchmark?.data,
                     host_intervals:window.hostBenchmark && {
                       raf_max_ms:Math.max(0,...hostBenchmark.intervals),
-                      native_max_ms:Math.max(0,...hostBenchmark.nativeIntervals)}};
+                      native_max_ms:Math.max(0,...hostBenchmark.nativeIntervals),
+                      long_tasks:hostBenchmark.longTasks}};
                 }''')
                 await page.screenshot(path=str(args.output/f'run-{index+1}-{role}-failure.png'))
             except Exception as diagnostic_error:
@@ -350,6 +378,7 @@ async def run(args, url):
         profile=dict(name=args.profile,**PROFILES[args.profile],scope='ordered local WebSocket byte stream; HTTP assets unshaped'),
         conditions=dict(viewport=dict(width=844,height=390),device_scale_factor=1,has_touch=True,
           separate_browser_processes=True, fresh_profiles_per_run=True,
+          host_cpu_profiling=args.profile_host,
           browser_profile='ephemeral contexts' if args.ephemeral else 'persistent temporary profiles',
           host_http_cache='disabled by developer HTML route; warm persistent asset store retained',
           guest_http_cache='enabled, cold fresh context then warm page in same context',
@@ -386,7 +415,9 @@ def main():
     parser.add_argument('--runs',type=int,default=3);parser.add_argument('--samples',type=int,default=10)
     parser.add_argument('--record-known-ub',action='store_true')
     parser.add_argument('--ephemeral',action='store_true',help='Diagnostic private contexts; WebKit may disable HTTP caching')
+    parser.add_argument('--profile-host',action='store_true',help='Diagnostic Chromium CPU profile; use equivalent settings for comparisons')
     args=parser.parse_args()
+    if args.profile_host and args.browser!='chromium':parser.error('Host CPU profiling requires Chromium')
     if not 1<=args.runs<=10 or not 1<=args.samples<=100: parser.error('Use 1–10 runs and 1–100 samples per run')
     if args.output.exists() and any(args.output.iterdir()): parser.error('Output must be a new or empty directory')
     identity=json.loads((args.build/'BUILD_INFO.json').read_text())

@@ -2,6 +2,16 @@
 include(CTest)
 set(all_test_targets "")
 
+if(EMSCRIPTEN)
+  # Unit programs run in Node, without the game's DOM shell or asset preload.
+  # The parent directory's linker flags are for the playable HTML executable.
+  set(CMAKE_EXECUTABLE_SUFFIX .js)
+  set(CMAKE_EXE_LINKER_FLAGS "-sDISABLE_EXCEPTION_CATCHING=0 -sENVIRONMENT=node -sALLOW_MEMORY_GROWTH=1")
+  if(CMAKE_BUILD_TYPE MATCHES Debug)
+    string(APPEND CMAKE_EXE_LINKER_FLAGS " -fsanitize=undefined -sSAFE_HEAP=1 -sASSERTIONS=1")
+  endif()
+endif()
+
 function(make_unit_test test_name)
   cmake_parse_arguments(PARSE_ARGV 1 mtargs
     "NO_PREPEND_SRC" "" "SOURCE;EXTERNAL;LIBRARIES;DEFINITIONS;INCLUDES")
@@ -37,6 +47,12 @@ make_unit_test(CollisionTest SOURCE collision_test.cpp
 make_unit_test(RemoteControllerTest SOURCE remote_controller_test.cpp
   EXTERNAL control/controller.cpp control/remote_controller.cpp
   INCLUDES ${CMAKE_BINARY_DIR})
+
+make_unit_test(SquirrelSchedulerTest SOURCE squirrel_scheduler_test.cpp
+  EXTERNAL squirrel/squirrel_scheduler.cpp video/color.cpp math/random.cpp
+  LIBRARIES simplesquirrel_static SDL3 glm
+  INCLUDES ${CMAKE_BINARY_DIR}
+    ${SUPERTUX_SOURCE_DIR}/external/simplesquirrel/libs/squirrel/include)
 
 message("ALL TESTS: ${all_test_targets}")
 

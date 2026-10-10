@@ -297,7 +297,7 @@
         // Preparation is exact-build checked before connecting. A complete
         // baseline acknowledgment is allowed during the engine loading gate.
         if (!buffer.accept(frame,performance.now())) return false;
-        const key=`${frame.session}/${frame.epoch}`;
+        const key=`${frame.session}/${frame.epoch}/${frame.generation}`;
         if (readyKey!==key) {
           if (!paintWorld(frame)) return false;
           readyKey=key;outcome=null;root.SupertuxView.onReady?.(frame);

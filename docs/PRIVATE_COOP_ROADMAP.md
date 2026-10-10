@@ -13,6 +13,8 @@ and adds repeatable baseline measurements. The staged Phase 8 plan is in
 Phase 8B adds bounded interpolation of matched native campaign draw geometry;
 its implementation and acceptance limits are in
 [PRIVATE_COOP_SMOOTHING.md](PRIVATE_COOP_SMOOTHING.md).
+After merged PR #16, [PRIVATE_COOP_RECOVERY.md](PRIVATE_COOP_RECOVERY.md)
+addresses measured heartbeat interruptions before the phone Host/Join polish.
 Phase 7B's supported scope and
 validation status are in
 [PRIVATE_COOP_SUPPORTED_LEVEL.md](PRIVATE_COOP_SUPPORTED_LEVEL.md).

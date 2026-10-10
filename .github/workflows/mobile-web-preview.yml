@@ -189,30 +189,37 @@ jobs:
         npx --yes wrangler@4 deploy --config wrangler.coop.toml 2>&1 | tee coop-staging-publish.log
         python3 staging-tools/tools/web/verify_coop_deployment.py --deployment-log coop-staging-publish.log >> "$GITHUB_OUTPUT"
     - name: Verify the exact hosted build and complete delivery
+      id: readiness
       env:
         STAGING_URL: ${{ steps.publish.outputs.url }}
       run: python3 staging-tools/tools/web/verify_coop_deployment.py --url "$STAGING_URL" --directory build --frontend dist
     - name: Hosted Chromium and WebKit two-browser display proof
+      id: browsers
       env:
         STAGING_URL: ${{ steps.publish.outputs.url }}
       run: |
-        python staging-tools/tests/wasm/coop_view_smoke.py build --url "$STAGING_URL" --output staging-evidence/chromium
-        python staging-tools/tests/wasm/coop_view_smoke.py build --url "$STAGING_URL" --browser webkit --output staging-evidence/webkit
+        browser_status=0
+        python staging-tools/tests/wasm/coop_view_smoke.py build --url "$STAGING_URL" --output staging-evidence/chromium || browser_status=$?
+        python staging-tools/tests/wasm/coop_view_smoke.py build --url "$STAGING_URL" --browser webkit --output staging-evidence/webkit || browser_status=$?
+        exit "$browser_status"
     - name: Phone acceptance instructions
+      if: ${{ !cancelled() && steps.readiness.outcome == 'success' }}
       env:
         STAGING_URL: ${{ steps.publish.outputs.url }}
         RUNTIME_REF: ${{ inputs.ref }}
+        BROWSER_RESULT: ${{ steps.browsers.outcome }}
       run: |
         {
           echo '## Private co-op HTTPS staging'
           echo
           echo "Host: $STAGING_URL/index.html?coop=1"
           echo "Tested runtime: $RUNTIME_REF"
+          echo "Delivery readiness: passed. Hosted browser acceptance: $BROWSER_RESULT."
           echo
           echo 'Phone A: tap Start, expand Private co-op, and create a room.'
           echo 'Phone B: open the Guest shared view invitation. Keep that invitation private.'
           echo 'Phone A: select Play Welcome to Antarctica after Player 2 joins. The static display arena remains a diagnostic test.'
-          echo 'Check independent touch movement/Jump, both players in the shared camera, pickups, enemy contact, checkpoint restart, level completion, pause/resume, rotation, backgrounding/rejoin, and host saves.'
+          echo 'Check independent touch movement/Jump, both players in the shared camera, pickups, enemy contact, checkpoint restart, level completion, pause/resume, rotation, backgrounding and new-room restart, and host saves.'
           echo 'Hosted Chromium/WebKit results are browser emulation; physical iPhone Safari and two-network testing still need people with devices.'
         } >> "$GITHUB_STEP_SUMMARY"
     - uses: actions/upload-artifact@v4

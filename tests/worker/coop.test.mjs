@@ -115,7 +115,7 @@ test('rate, idle/auth timeout, disconnect and expiry clean up without buffering'
   assert.deepEqual(host.messages.at(-1),{type:'peer',connected:false});
   f = fixture(); guest=f.add('guest');guest.info.opened=Date.now()-6000;
   await f.object.alarm();assert.equal(guest.closed.code,1001);
-  f = fixture();host=f.add('host');await ready(f,host);host.info.last=Date.now()-3000;
+  f = fixture();host=f.add('host');await ready(f,host);host.info.last=Date.now()-16000;
   await f.object.alarm();assert.equal(host.closed.code,1001);assert.equal(f.state.storage.room,null);
   f = fixture();host=f.add('host');f.room.expires=Date.now()-1;
   await f.object.alarm();assert.equal(host.closed.code,1008);assert.equal(f.state.storage.room,null);
@@ -126,8 +126,12 @@ test('unacknowledged receiver has a fixed message window; role fields are reject
   await ready(f,host);await ready(f,guest);
   await send(f.object,host,{type:'session',generation:1,enabled:true});
   for(let i=0;i<33 && !host.closed;i++) await send(f.object,guest,{type:'input',generation:1,sequence:i+1,mask:i%2});
-  assert.equal(host.closed.code,1013);
+  assert.equal(host.closed,undefined);
+  assert.ok(f.room.interruption);
+  assert.equal(host.info.inFlight,32);
   assert.ok(host.messages.length <= 32);
+  f.room.interruption.started=Date.now()-16000;
+  await f.object.alarm();assert.equal(host.closed.code,1001);assert.equal(f.state.storage.room,null);
   const other=fixture(), client=other.add('guest');await ready(other,client);
   await send(other.object,client,{type:'input',generation:1,sequence:1,mask:2,role:'host'});
   assert.equal(client.closed.code,1008);
@@ -153,10 +157,10 @@ test('slow status receiver retains only three latest values and drains on credit
   assert.equal(guest.closed,undefined);
 });
 
-test('only a neutral host gets bounded loading grace, not active play or guests', async () => {
+test('startup/loading grace is bounded; active heartbeat gaps freeze without closing immediately', async () => {
   for (const [role, enabled, idle, closes] of [
     ['host',false,4000,false], ['host',false,16000,true],
-    ['host',true,3000,true], ['guest',false,3000,true],
+    ['host',true,3000,false], ['guest',false,3000,false], ['host',true,16000,true], ['guest',false,16000,true],
   ]) {
     const f=fixture(), socket=f.add(role);await ready(f,socket);
     if (role==='host') await send(f.object,socket,{type:'session',generation:1,enabled});
@@ -179,6 +183,61 @@ test('valid receive credits do not double-charge the client command budget', asy
     await send(f.object,guest,{type:'seen'});
   }
   assert.equal(guest.closed.reason,'Input rate exceeded');
+});
+
+test('missed active heartbeat blocks delayed input until a fresh neutral generation; hard expiry remains bounded', async () => {
+  const f=fixture(), host=f.add('host'), guest=f.add('guest'); await ready(f,host); await ready(f,guest);
+  await send(f.object,host,{type:'session',generation:1,enabled:true});
+  host.info.last=Date.now()-3000;
+  // Exercise the returning-message race without relying on the alarm firing.
+  await send(f.object,guest,{type:'input',generation:1,sequence:1,mask:2});
+  assert.equal(host.closed,undefined); assert.ok(f.room.interruption);
+  assert.equal(host.messages.filter(x=>x.type==='input').length,0);
+  await send(f.object,host,{type:'session',generation:1,enabled:false}); assert.ok(f.room.interruption);
+  await send(f.object,host,{type:'session',generation:2,enabled:true}); assert.ok(f.room.interruption);
+  await send(f.object,host,{type:'session',generation:3,enabled:false}); assert.equal(f.room.interruption,undefined);
+  assert.deepEqual(host.messages.at(-1),{type:'connection',interrupted:false});
+  await send(f.object,guest,{type:'input',generation:1,sequence:2,mask:2});
+  assert.equal(host.messages.filter(x=>x.type==='input').length,0);
+  await send(f.object,host,{type:'session',generation:4,enabled:true});
+  await send(f.object,guest,{type:'input',generation:4,sequence:1,mask:0});
+  assert.equal(host.messages.at(-1).mask,0);
+  guest.info.last=Date.now()-3000; await f.object.alarm(); assert.ok(f.room.interruption);
+  f.room.interruption.started=Date.now()-16000;
+  await send(f.object,host,{type:'ping'}); assert.ok(host.closed); assert.equal(f.state.storage.room,null);
+});
+
+test('coalesced recovery status cannot replay an old recovered notification after a newer interruption', async () => {
+  const f=fixture(), host=f.add('host'), guest=f.add('guest');await ready(f,host);await ready(f,guest);
+  guest.info.inFlight=32;
+  f.object.send(guest,{type:'connection',interrupted:true});
+  f.object.send(guest,{type:'connection',interrupted:false});
+  f.object.send(guest,{type:'connection',interrupted:true});
+  assert.deepEqual(Object.keys(guest.info.pending),['connection']);
+  await send(f.object,guest,{type:'seen'});
+  assert.deepEqual(guest.messages.at(-1),{type:'connection',interrupted:true});
+  assert.equal(guest.info.inFlight,32);
+});
+
+test('a full host input window starts bounded neutral recovery without closing sockets or queuing extra edges',async()=>{
+  const f=fixture(),host=f.add('host'),guest=f.add('guest');await ready(f,host);await ready(f,guest);
+  await send(f.object,host,{type:'session',generation:1,enabled:true});
+  host.info.inFlight=32;
+  await send(f.object,guest,{type:'input',generation:1,sequence:1,mask:2});
+  assert.ok(f.room.interruption);assert.equal(host.closed,undefined);assert.equal(guest.closed,undefined);
+  assert.equal(host.info.inFlight,32);assert.equal(host.info.pending.connection.interrupted,true);
+  await send(f.object,guest,{type:'input',generation:1,sequence:2,mask:0});
+  assert.equal(host.messages.filter(x=>x.type==='input').length,0);
+  await send(f.object,host,{type:'seen'});
+  assert.deepEqual(host.messages.at(-1),{type:'connection',interrupted:true});
+  await send(f.object,host,{type:'session',generation:1,enabled:false});assert.ok(f.room.interruption);
+  await send(f.object,host,{type:'session',generation:2,enabled:false});assert.equal(f.room.interruption,undefined);
+  while(host.info.inFlight>0)await send(f.object,host,{type:'seen'});
+  await send(f.object,host,{type:'session',generation:3,enabled:true});
+  await send(f.object,guest,{type:'input',generation:1,sequence:3,mask:2});
+  assert.equal(host.messages.filter(x=>x.type==='input').length,0);
+  await send(f.object,guest,{type:'input',generation:3,sequence:1,mask:0});
+  assert.deepEqual(host.messages.at(-1),{type:'input',generation:3,sequence:1,mask:0});
 });
 
 test('unsolicited receive credits cannot bypass rate or backpressure limits', async () => {
@@ -220,9 +279,9 @@ test('only matching guest baselines acknowledge readiness; authoritative complet
   const f=fixture(),host=f.add('host'),guest=f.add('guest');await ready(f,host);
   await send(f.object,guest,{type:'hello',protocol:PROTOCOL,build,view:true});
   await send(f.object,host,{type:'session',generation:1,enabled:false});await send(f.object,host,campaign());
-  await send(f.object,guest,{type:'view-ready',session:1,epoch:2});
+  await send(f.object,guest,{type:'view-ready',session:1,epoch:2,generation:1});
   assert.equal(host.messages.some(p=>p.type==='view-ready'),false);
-  await send(f.object,guest,{type:'view-ready',session:1,epoch:1});
+  await send(f.object,guest,{type:'view-ready',session:1,epoch:1,generation:1});
   assert.equal(host.messages.at(-1).type,'view-ready');
   // Exercise the actual full receive window: completion must remain separate
   // from a coalesced visual frame and survive a hibernation reconstruction.
