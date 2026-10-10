@@ -75,6 +75,17 @@ cannot cover Resume or Return to title while paused. The restart button uses the
 same minimum 44-pixel target as the other activation controls.
 Long invitations remain scrollable inside short phone viewports.
 
+Self-review found that waiting for the save promise was insufficient: the storage
+API resolves **false** when persistence fails. The title restart now requires a
+true result. A failed, rejected or unavailable save keeps the paused page open,
+shows a retry message on the overlay and re-enables Return to title. Repeated taps
+cannot start overlapping restarts. If storage stays unavailable, deliberately
+reloading/closing the page still loses unsaved session changes; the game does not
+silently choose that loss. The two focused regressions fail before the correction
+and pass afterwards. A compiled browser check verifies both the failed-save hold
+and the subsequent durable settings/progression-fixture flush and hydration after
+an actual document reload.
+
 ## Script binding and scheduler corrections
 
 Release and Debug exact-source CI exposed the same `intro.nut` error during
@@ -245,11 +256,12 @@ long tasks. Failed console fixtures preserve the trace and current shell/input
 states, including failures before the command executes. No unexpected pause is
 automatically resumed to make a test pass.
 
-The final runtime is `7c7926478e40f24cf6bca972609f1a86ee5d1de4`, using
+The first validated and published recovery runtime is
+`7c7926478e40f24cf6bca972609f1a86ee5d1de4`, using
 Emscripten 6.0.11 and pinned vcpkg
 `c748cb44f2a435fcf015c35225c9d5545fe0021c`.
 
-| Final-source local validation | Result |
+| First published runtime: local validation | Result |
 | --- | --- |
 | Complete Release and Debug artifacts | Source, configuration and all payloads verified |
 | C++ units: native Debug, WASM Release, WASM Debug | Five per configuration pass, including both script regressions |
@@ -294,6 +306,38 @@ remain enabled, and the existing persistent trust store was not changed. Hosted
 Chromium acceptance uses the GitHub runner without this cloud-local trust issue.
 
 Previous revisions' passing checks do not substitute for final-source results.
+
+The final save correction is frozen at
+`52d8bf370bee4b97b1a943beec695274fb13b518`. Its
+[focused PR validation](https://github.com/jbbejena/supertux/actions/runs/38023547972)
+and [non-PR Release/Debug validation](https://github.com/jbbejena/supertux/actions/runs/38023544506)
+are recorded independently from the first published runtime above.
+All six needed focused PR jobs, including both WASM configurations, Linux and
+Required validation, pass for that source. The separate non-PR Debug job passes;
+its first Release attempt fails at the information-panel fixture after a
+2,508.1 ms host gap. Both sockets remain authenticated with neutral input and
+explicit Resume required. A single failed-Release-job rerun uses identical
+source/assertions; inspect that linked run for its final conclusion. The failed
+attempt remains recorded and does not establish reliable uninterrupted play.
+
+| Final save-correction runtime: local validation | Result |
+| --- | --- |
+| Release and Debug complete artifacts | Exact source/configuration/all payload identities verified |
+| WASM unit programs | Five pass in each configuration |
+| Focused JavaScript / Python / workflow syntax | 86 JavaScript, 22 Python and actionlint pass |
+| Representative Linux CI | Pass |
+| Release WebKit shared view | 24 pass, including failed-save hold and durable retry/hydration |
+| Debug Chromium shared view | 24 pass; existing sanitizer annotations retained |
+| Release Chromium shared view | Fails growth-pickup fixture after a 4,539.3 ms host gap; room survives neutral and paused |
+
+The updated staging workflow is also exercised in
+[run 38022991042](https://github.com/jbbejena/supertux/actions/runs/38022991042)
+against the previous exact successful `7c792647` artifact. Delivery readiness
+passes. Chromium fails at growth pickup after a 4,058.2 ms host gap; WebKit still
+runs and passes all 23 checks. The workflow remains failed, retains both reports
+and supplies the delivery/browser status summary. The final save correction may
+replace staging only after its explicit successful non-PR artifact is available.
+
 The restored-pacing `87d24f9f` passed local Chromium shared-view checks, but its
 manual CI failed normal touch entry and Debug remote jump. The later `0cfbc303`
 passed all five unit programs in each WASM configuration and native Debug,

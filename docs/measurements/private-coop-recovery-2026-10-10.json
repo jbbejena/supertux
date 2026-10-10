@@ -2,7 +2,7 @@
   "schema": 1,
   "date_utc": "2026-10-10",
   "physical_device_tested": false,
-  "final_runtime": "7c7926478e40f24cf6bca972609f1a86ee5d1de4",
+  "final_runtime": "52d8bf370bee4b97b1a943beec695274fb13b518",
   "experiment": {
     "status": "rejected and rolled back; final pacing unchanged",
     "before_runtime": "9ebad10f32c039281b8b1db8779a5411673ee35a",
@@ -1151,52 +1151,6 @@
   },
   "startup_data_raw_bytes": 176669514,
   "deferred_music_raw_bytes": 150011881,
-  "exact_non_pr_validation_run": 38016814903,
-  "pr_validation_run": 38016818646,
-  "local_validation": {
-    "complete_release_artifact": "verified",
-    "complete_debug_artifact": "verified",
-    "release_wasm_unit_tests": 5,
-    "debug_wasm_unit_tests": 5,
-    "native_debug_unit_tests": 5,
-    "loader_relay_shell_tests": 85,
-    "python_workflow_packaging_tests": 22,
-    "compiled_browser_acceptance": "Exact-source focused Release/Debug CI and non-PR validation pass; ordinary local Release failure and manual attempt-1 failure retained separately.",
-    "physical_device_tested": false,
-    "release_chromium_touch_checks": 10,
-    "release_webkit_touch_checks": 10,
-    "release_webkit_shared_view_checks": 23,
-    "release_chromium_shared_view": {
-      "status": "failed",
-      "at": "growth pickup script fixture",
-      "host_long_task_ms": 4286,
-      "host_gap_ms": 4286.9,
-      "both_sockets_connected": true,
-      "guest_mask": 0,
-      "host_paused": true,
-      "permanent_loss": false,
-      "automatic_resume": false
-    },
-    "debug_chromium_shared_view_checks": 23,
-    "release_chromium_remote_input_checks": 18,
-    "debug_chromium_remote_input_checks": 18,
-    "release_chromium_diagnostic_shared_view_checks": 23,
-    "diagnostic_conditions": "Same source/assertions; CDP 1 ms sampling during campaign through growth pickup. This diagnostic pass does not replace the failed ordinary run.",
-    "earlier_growth_profile_attempt": "Failed after campaign screenshot before the profiling target; no CPU profile captured."
-  },
-  "pr_validation_status": "success: six required jobs",
-  "exact_non_pr_attempts": [
-    {
-      "attempt": 1,
-      "release": "failure: growth-pickup fixture, 2790 ms host gap; room recovered with neutral input and explicit Resume required",
-      "debug": "success"
-    },
-    {
-      "attempt": 2,
-      "release": "success",
-      "scope": "rerun failed job only, same source and assertions"
-    }
-  ],
   "current_runtime_campaign_profile": {
     "elapsed_ms": 58141.029,
     "sampled_ms": 58138.921,
@@ -1302,7 +1256,8 @@
         "url": "http://127.0.0.1:45671/coop.js"
       }
     ],
-    "scope": "Campaign selection through growth pickup; includes deliberate 3.2-second host stall, fixture setup and idle time; sampled self time, not exact CPU cost or physical-device performance."
+    "scope": "Campaign selection through growth pickup; includes deliberate 3.2-second host stall, fixture setup and idle time; sampled self time, not exact CPU cost or physical-device performance.",
+    "runtime": "7c7926478e40f24cf6bca972609f1a86ee5d1de4"
   },
   "staging": {
     "run": 38020319030,
@@ -1368,5 +1323,137 @@
     "diagnostic_result": "failure: growth-pickup fixture; 2839 ms host gap; safely paused with both sockets authenticated",
     "sampled_vertex_attrib_pointer_ms": 19607.7,
     "claim": "No final rendering change or reliable speed improvement; sample durations differ and include idle failure wait"
+  },
+  "initial_validated_runtime": "7c7926478e40f24cf6bca972609f1a86ee5d1de4",
+  "initial_exact_non_pr_validation_run": 38016814903,
+  "initial_pr_validation_run": 38016818646,
+  "initial_local_validation": {
+    "complete_release_artifact": "verified",
+    "complete_debug_artifact": "verified",
+    "release_wasm_unit_tests": 5,
+    "debug_wasm_unit_tests": 5,
+    "native_debug_unit_tests": 5,
+    "loader_relay_shell_tests": 85,
+    "python_workflow_packaging_tests": 22,
+    "compiled_browser_acceptance": "Exact-source focused Release/Debug CI and non-PR validation pass; ordinary local Release failure and manual attempt-1 failure retained separately.",
+    "physical_device_tested": false,
+    "release_chromium_touch_checks": 10,
+    "release_webkit_touch_checks": 10,
+    "release_webkit_shared_view_checks": 23,
+    "release_chromium_shared_view": {
+      "status": "failed",
+      "at": "growth pickup script fixture",
+      "host_long_task_ms": 4286,
+      "host_gap_ms": 4286.9,
+      "both_sockets_connected": true,
+      "guest_mask": 0,
+      "host_paused": true,
+      "permanent_loss": false,
+      "automatic_resume": false
+    },
+    "debug_chromium_shared_view_checks": 23,
+    "release_chromium_remote_input_checks": 18,
+    "debug_chromium_remote_input_checks": 18,
+    "release_chromium_diagnostic_shared_view_checks": 23,
+    "diagnostic_conditions": "Same source/assertions; CDP 1 ms sampling during campaign through growth pickup. This diagnostic pass does not replace the failed ordinary run.",
+    "earlier_growth_profile_attempt": "Failed after campaign screenshot before the profiling target; no CPU profile captured."
+  },
+  "initial_pr_validation_status": "success: six required jobs",
+  "initial_exact_non_pr_attempts": [
+    {
+      "attempt": 1,
+      "release": "failure: growth-pickup fixture, 2790 ms host gap; room recovered with neutral input and explicit Resume required",
+      "debug": "success"
+    },
+    {
+      "attempt": 2,
+      "release": "success",
+      "scope": "rerun failed job only, same source and assertions"
+    }
+  ],
+  "updated_staging_workflow_validation": {
+    "run": 38022991042,
+    "tooling_source": "ba4881c9b57b2b479c6103037df5e5931387ed6c",
+    "runtime": "7c7926478e40f24cf6bca972609f1a86ee5d1de4",
+    "readiness": "success",
+    "chromium": "failure: growth pickup fixture; 4058.2 ms host gap; room authenticated, input neutral, explicit Resume required",
+    "webkit": "success: 23 checks; no console/script errors",
+    "overall": "failure retained; second browser ran despite first failure"
+  },
+  "save_failure_correction": {
+    "runtime": "52d8bf370bee4b97b1a943beec695274fb13b518",
+    "behavior": "Return to title requires save API result true; false, rejected, or missing API retains paused page and displays retry; repeated taps do not overlap",
+    "regression_before": "Two focused tests fail: overlapping restart attempts and navigation after failed save",
+    "regression_after": "86 JavaScript tests pass; 22 Python tests and actionlint pass",
+    "compiled_browser_check": "24th check: failed save retains page; restored API flushes settings/progression fixture bytes and hydrates them after a verified document reload"
+  },
+  "final_validation": {
+    "focused_pr_run": 38023547972,
+    "exact_non_pr_run": 38023544506,
+    "release_artifact": "verified complete, exact source/configuration/payloads",
+    "debug_artifact": "verified complete, exact source/configuration/payloads",
+    "wasm_units": "5 pass per configuration",
+    "representative_linux": "success",
+    "release_webkit": "24 pass, errors []",
+    "release_chromium": "failure: growth-pickup fixture; 4539.3 ms host gap; authenticated room, neutral controls, paused pending Resume",
+    "debug_chromium": "24 pass; errors []; existing known upstream sanitizer sites only",
+    "required_ci": "success: all six needed jobs, including Release/Debug WASM, representative Linux, lint/focused tests, selection and Required validation",
+    "physical_device_tested": false,
+    "save-fixed-release-webkit": {
+      "browser": "26.5",
+      "configuration": "Release",
+      "checks": 24,
+      "errors": [],
+      "metrics": {
+        "input_to_visible_30px_ms": 326,
+        "snapshot_count": 99,
+        "snapshot_bytes_max": 469,
+        "snapshot_bytes_per_second": 4145,
+        "snapshot_hz": 9.4,
+        "interpolation_delay_ms": 90,
+        "buffer_limit": 8,
+        "campaign_selection_to_ready_ms": 840,
+        "campaign_input_to_30_world_px_ms": 486,
+        "campaign_interpolated_draws": 12,
+        "campaign_snapshot_bytes_max": 51762,
+        "campaign_snapshot_hz": 7.3,
+        "campaign_snapshot_bytes_per_second": 247846
+      },
+      "physical_device_tested": false
+    },
+    "save-fixed-debug-chromium": {
+      "browser": "151.0.7922.34",
+      "configuration": "Debug",
+      "checks": 24,
+      "errors": [],
+      "metrics": {
+        "input_to_visible_30px_ms": 335,
+        "snapshot_count": 134,
+        "snapshot_bytes_max": 482,
+        "snapshot_bytes_per_second": 3826,
+        "snapshot_hz": 8.4,
+        "interpolation_delay_ms": 90,
+        "buffer_limit": 8,
+        "campaign_selection_to_ready_ms": 2580,
+        "campaign_input_to_30_world_px_ms": 778,
+        "campaign_interpolated_draws": 21,
+        "campaign_snapshot_bytes_max": 52154,
+        "campaign_snapshot_hz": 4.7,
+        "campaign_snapshot_bytes_per_second": 162745
+      },
+      "physical_device_tested": false
+    },
+    "exact_non_pr_attempts": [
+      {
+        "attempt": 1,
+        "release": "failure: information-panel fixture; 2508.1 ms host gap; room authenticated with neutral controls; explicit Resume required",
+        "debug": "success"
+      },
+      {
+        "attempt": 2,
+        "scope": "single failed-Release-job rerun; unchanged source/assertions; see exact run for final conclusion"
+      }
+    ],
+    "exact_non_pr_final_conclusion": "Inspect explicit run 38023544506; one failed Release attempt and its single unchanged-source rerun are recorded separately."
   }
 }
