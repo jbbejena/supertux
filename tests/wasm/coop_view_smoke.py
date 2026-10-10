@@ -92,7 +92,12 @@ async def run(args, url):
           window.lastViewPacket=null;const publish=Module.supertuxCoop.view;
           Module.supertuxCoop.view=frame=>{lastViewPacket=frame;publish(frame);};
           window.viewInputFrames=0;const status=Module.supertuxCoop.engineStatus;
-          Module.supertuxCoop.engineStatus=(...args)=>{++viewInputFrames;status(...args);};
+          Module.supertuxCoop.engineStatus=(...args)=>{
+            const previous=Module.supertuxCoop.state;
+            ++viewInputFrames;status(...args);
+            if(previous.generation!==args[2] || previous.enabled!==!!args[1])
+              record('input-generation',{previous,current:Module.supertuxCoop.state});
+          };
         }''')
         async def host_key(key):
             # Observe a native input update after each edge. Wall-clock presses
@@ -134,7 +139,7 @@ async def run(args, url):
                 await guest.wait_for_function('SupertuxView.playable && SupertuxView.state.drawn && ('+expression+')',timeout=timeout)
             except Exception:
                 diagnostic={'guest':await guest.evaluate('({guest:supertuxGuest.state,view:SupertuxView.state,status:document.querySelector("#guest_status").textContent,viewStatus:document.querySelector("#view_status").textContent})'),
-                            'host':await host.evaluate('({state:Module.supertuxCoop.state,active:Module.supertuxShell.active,status:document.querySelector("#coop_status").textContent,packet:window.lastViewPacket})')}
+                            'host':await host.evaluate('({state:Module.supertuxCoop.state,active:Module.supertuxShell.active,status:document.querySelector("#coop_status").textContent,packet:window.lastViewPacket,lifecycle:window.viewLifecycle})')}
                 (args.output/'failure-state.json').write_text(json.dumps(diagnostic,indent=2)+'\n')
                 print('VIEW_SAMPLE_FAILED',label,diagnostic['host']['state'],diagnostic['host']['status'],flush=True)
                 await guest.screenshot(path=str(args.output/'sample-guest-failure.png'))
