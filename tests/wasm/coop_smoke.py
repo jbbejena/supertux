@@ -298,6 +298,13 @@ async def run(args, url):
         for _ in range(600):
             if any('Setting status: In worldmap' in line for line in logs[end_start:]): break
             await host.wait_for_timeout(100)
+        if not any('Setting status: In worldmap' in line for line in logs[end_start:]):
+            diagnostic={'host':await host.evaluate('''() => ({active:Module.supertuxShell.active,
+                state:Module.supertuxCoop.state,connected:!!Module.supertuxCoop.connection?.ready,
+                status:document.querySelector('#coop_status').textContent})''')}
+            if guest:
+                diagnostic['guest']=await guest.evaluate("({state:supertuxGuest.state,status:document.querySelector('#guest_status').textContent})")
+            (args.output/'completion-failure-state.json').write_text(json.dumps(diagnostic,indent=2))
         assert any('Setting status: In worldmap' in line for line in logs[end_start:]),logs[-6:]
         await host.wait_for_timeout(500)
         if guest: assert not await host.evaluate('Module.supertuxCoop.state.enabled')

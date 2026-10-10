@@ -57,11 +57,11 @@ async def run(args, url):
         await guest.wait_for_function('supertuxGuest.state.connected',timeout=90000)
         await host.wait_for_function('Module.supertuxCoop.state.reserved===1')
         await host.wait_for_function('!Module.supertuxShell.active && !Module.supertuxCoop.state.enabled')
-        # Restore SDL's window-focus state as a real foreground return does.
-        # Canvas/button focus alone cannot undo a synthetic window blur.
-        await host.evaluate("window.dispatchEvent(new Event('focus'))")
         await host.locator('#start_button').click()
         await host.wait_for_function('Module.supertuxShell.active')
+        # SDL selects its focused window from the currently focused canvas.
+        # Pair our synthetic blur after trusted Resume has focused that canvas.
+        await host.evaluate("window.dispatchEvent(new Event('focus'))")
         report['checks'].append('Blur between guest notification and native polling preserves the remote ownership command while retiring input; trusted Resume keeps Player 2 joined')
         await host.evaluate('''() => {
           window.lastViewPacket=null;const publish=Module.supertuxCoop.view;
