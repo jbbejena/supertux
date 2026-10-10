@@ -6,11 +6,17 @@ failures measured in [PRIVATE_COOP_SMOOTHING.md](PRIVATE_COOP_SMOOTHING.md).
 It does not claim to finish the phone Host/Join flow or physical-device acceptance.
 
 The implementation is under review in [PR #17](https://github.com/jbbejena/supertux/pull/17).
-Final runtime `0cfbc3038b80ab3d57dd0918bd987dce30b60f51` is validating in
-[focused PR checks](https://github.com/jbbejena/supertux/actions/runs/38015352041)
-and [exact-source non-PR WebAssembly checks](https://github.com/jbbejena/supertux/actions/runs/38015347968).
-Earlier failed runs are retained below. They are not passing recovery tests.
-The private HTTPS Worker has not been updated with this runtime.
+Runtime `7c7926478e40f24cf6bca972609f1a86ee5d1de4` passes all six
+[focused PR checks](https://github.com/jbbejena/supertux/actions/runs/38016818646),
+including Release/Debug WASM and representative Linux. The
+[exact-source non-PR WebAssembly run](https://github.com/jbbejena/supertux/actions/runs/38016814903)
+passed Debug but failed its first Release attempt at a 2.79-second host stall.
+Its second Release attempt passes on the identical source and assertions; the
+first failure remains recorded. Both non-PR configurations are successful.
+[Private staging publication](https://github.com/jbbejena/supertux/actions/runs/38020319030)
+reuses that exact Release artifact. The Worker now serves this runtime and its
+frontend/manifest/payload readiness checks pass. Hosted two-browser results are
+retained in that run; physical-device acceptance remains separate.
 
 ## Failure and resulting behavior
 
@@ -32,8 +38,12 @@ input. Recovery requires both peers to be recently responsive and a new neutral
 native input generation. A changed generation with input still enabled is
 insufficient. Connection notifications occupy one coalesced latest-state slot,
 so backpressure cannot replay an older recovered status after a new interruption.
-The existing 32-message window, input queue, payload limits and role validation
-remain in force.
+A full host receive window applies the same interruption barrier before another
+input is forwarded. Further edges are discarded until neutral recovery, rather
+than closing a still-authenticated socket or retaining a larger backlog. This
+fixes the observed four-second host stall that exhausted receive credit before
+the heartbeat alarm. The existing 32-message window, input queue, payload limits
+and role validation remain in force; recovery still expires after 15 seconds.
 
 The game stays paused after the connection recovers. The host presses the existing
 trusted **Resume** button, preserving browser audio activation. Welcome to
@@ -59,22 +69,32 @@ cannot cover Resume or Return to title while paused. The restart button uses the
 same minimum 44-pixel target as the other activation controls.
 Long invitations remain scrollable inside short phone viewports.
 
-## Script-scheduler correction
+## Script binding and scheduler corrections
 
-An exact-source Release run failed normal touch entry with a Squirrel error in
-`intro.nut`'s `shake_bush()` while skipping the story. Review found that the
-scheduler removed its heap entry **after** waking the script. That callback can
-schedule additional threads and reorder the heap, causing the newly scheduled
-entry to be removed and the old one to run again. This ordering bug is independent
-of the co-op transport.
+Release and Debug exact-source CI exposed the same `intro.nut` error during
+normal touch entry: `shake_bush()` attempted float arithmetic with a table.
+The root cause was the global `rand()` binding. On 32-bit WASM, `SQInteger`
+aliases C++ `int`; SimpleSquirrel treats that return type as the number of
+results already pushed onto the Squirrel stack. The binding returned a random
+integer without pushing it, so scripts could receive an unrelated stack value.
+The old binding's isolated regression passes on native 64-bit and fails in
+WASM with `rand returned a non-integer`.
 
+The binding now explicitly pushes the integer and returns one stack result.
+It preserves the existing RNG and seeded sequence. The actual-VM regression
+checks 64 integer results against that sequence and exercises the intro's
+float/modulo arithmetic. It passes in native Debug, WASM Release and WASM Debug.
+Normal-entry browser checks still reject script errors; no error is ignored.
+
+A separate review found scheduler reentrancy: the scheduler removed its heap
+entry **after** waking a script that could add threads and reorder the heap.
+It could remove the newly scheduled entry and execute the original again.
 The entry now retires before waking the script, with its reference held through
-the callback. A regression using the actual Squirrel VM schedules a second,
-earlier-wake thread from inside the first callback. It fails before the fix and
-passes after it, asserting that the second thread runs and the first waits until
-its requested later deadline. The native representative suite and both WASM
-configurations run this regression. The final normal-entry browser checks still
-reject script errors; no console error is ignored to pass CI.
+the callback. An actual-VM regression schedules an earlier-wake thread inside
+the first callback and verifies both deadlines. It fails before that fix and
+passes afterwards. This was a real independent bug; it did not resolve the
+intro's random-binding failure. Both regressions run in the representative
+native build and both WASM configurations.
 
 ## Frame-pacing experiment and diagnosis
 
@@ -111,6 +131,18 @@ These CPU-quota windows include setup and are longer than the sampling profiles.
 Requests to limit SwiftShader through `SwiftShader.ini`, including a GPU
 launcher with an explicit working directory, still produced five worker
 threads. Those probes do not establish an effective driver configuration.
+
+A final-source diagnostic through campaign selection and growth pickup passes
+all 23 shared-view checks. Its 58.14-second profile samples 15,906.5 ms in
+`vertexAttribPointer` and 7,771.8 ms across `_emscripten_get_now`/`now`.
+It includes fixture setup, the deliberate 3.2-second host stall and idle time;
+these are sampled self times, not exact CPU costs. The profile points to costly
+WebGL state submission on this cloud software renderer. It does not isolate
+every stall or establish physical-phone performance. The earlier profiling
+attempt failed after the campaign screenshot before reaching its target and
+captured no profile. Neither diagnostic replaces the failed ordinary Release
+run. Reducing redundant vertex-attribute setup is a concrete follow-up to
+measure separately; the recovery patch retains existing rendering and pacing.
 
 ## Repeated measurements of the rejected experiment
 
@@ -150,9 +182,10 @@ in that same profile. Host HTTP caching is disabled by its diagnostic HTML route
 while its persistent asset store remains. Guest HTTP caching remains enabled.
 This tests same-profile reuse, not reopening a fully restarted browser.
 
-All eight completed before trials and five completed experimental trials show
-backend startup transfers of two requests / **137,499,041 response-body bytes**
-on the cold host and **zero** startup-package requests/bytes on the warm host.
+All completed trials show two cold-host startup transfers: **137,499,041
+response-body bytes** for the eight before trials and **137,499,033 bytes** for
+the five experimental trials. The warm host makes **zero** startup-package
+requests and transfers zero startup-package body bytes.
 The cold guest fetches 1,049 artwork objects / **18,637,169 body bytes**; the warm
 guest fetches no artwork bodies from the backend. WebKit's browser counters still
 show header/revalidation traffic, so this is not zero total HTTP traffic.
@@ -198,40 +231,43 @@ long tasks. Failed console fixtures preserve the trace and current shell/input
 states, including failures before the command executes. No unexpected pause is
 automatically resumed to make a test pass.
 
-The rejected scheduling experiment used
-`df1fb8f121f1823abd4368bfd12638941f3dfb3a`, Release and Debug,
-Emscripten 6.0.11 with pinned vcpkg
-`c748cb44f2a435fcf015c35225c9d5545fe0021c`. Both complete local artifacts verify
-their source, configuration and full manifest. Release WebKit and Debug Chromium
-pass all 23 compiled shared-view checks. Release and Debug Chromium each pass
-12 single-player/browser checks and 10 touch checks. Local GCC 14 Debug passes
-four native tests; the representative GitHub Linux Release build passes.
-Five pre-existing Debug sanitizer sites remain explicitly annotated; new sites
-fail. Loader/relay/shell tests pass 84 checks and Python packaging/workflow tests
-pass 22 checks.
+The final runtime is `7c7926478e40f24cf6bca972609f1a86ee5d1de4`, using
+Emscripten 6.0.11 and pinned vcpkg
+`c748cb44f2a435fcf015c35225c9d5545fe0021c`.
 
-The preceding recovery runtime at `9ebad10f32c039281b8b1db8779a5411673ee35a`
-passed all 23 shared-view checks in Release Chromium, Release WebKit and Debug
-Chromium. The experiment's Release Chromium attempts and exact-source GitHub Release
-checks failed; earlier passing results were not substituted for them. The
-restored-pacing runtime is `87d24f9f5b32b702d8108770a0e907cafa78e904`.
-Its product source matches the earlier recovery runtime. Local Release Chromium
-and Debug Chromium passed all 23 checks at this source; Release WebKit failed
-its observed same-snapshot intermediate-geometry assertion. The exact-source
-manual run failed Release's touch entry (the intro script error above) and Debug's
-remote jump assertion. The later `0cfbc3038b80ab3d57dd0918bd987dce30b60f51`
-adds the loading-timeout fence and script-scheduler fix. WASM unit programs use
-a scoped Node linker configuration, separate from the game HTML loader; both
-Release and Debug pass the scheduler regression locally. Its complete artifacts
-and browser validation are tracked separately.
+| Final-source local validation | Result |
+| --- | --- |
+| Complete Release and Debug artifacts | Source, configuration and all payloads verified |
+| C++ units: native Debug, WASM Release, WASM Debug | Five per configuration pass, including both script regressions |
+| Loader/relay/shell; Python packaging/workflow | 85 JavaScript and 22 Python tests pass |
+| Release normal-entry/touch, Chromium and WebKit | Ten checks each pass; no script errors |
+| Release WebKit; Debug Chromium shared view | 23 checks each pass |
+| Release and Debug Chromium remote input | 18 checks each pass |
+| Ordinary Release Chromium shared view | Fails growth-pickup fixture after a 4,286.9 ms host stall |
+| Diagnostic Release Chromium shared view | 23 pass with 1 ms CDP sampling; separate from ordinary acceptance |
 
-Both complete local Release/Debug previews verify source
-`0cfbc3038b80ab3d57dd0918bd987dce30b60f51`, configuration and complete payloads.
-All five C++ unit programs pass through Node in each WASM configuration; the
-native GCC 14 Debug suite also passes all five, including the scheduler regression.
-The compiled browser suite is still running; use the linked exact-source CI
-results for final acceptance. Staging publication remains gated on both successful
-non-PR configurations and hosted readiness/browser validation.
+The ordinary Chromium failure preserves both sockets, neutral Player 2 and a
+host paused awaiting trusted Resume. The suite does not automatically resume
+unexpected pauses. Exact-source focused CI passes both configurations and its
+required gate. The separate non-PR Release attempt fails at the same fixture
+after a 2,790 ms host stall, again preserving the room and neutral controls.
+These failures remain recorded and are not passing acceptance. The single
+failed-job rerun passes Release on the same source and unchanged assertions;
+Debug already passed. The resulting successful non-PR run provides the exact
+artifact for private staging. Five pre-existing Debug sanitizer sites remain explicitly
+annotated; new sites fail. Hosted readiness/browser results are recorded in
+[the exact-source private publication run](https://github.com/jbbejena/supertux/actions/runs/38020319030).
+
+Previous revisions' passing checks do not substitute for final-source results.
+The restored-pacing `87d24f9f` passed local Chromium shared-view checks, but its
+manual CI failed normal touch entry and Debug remote jump. The later `0cfbc303`
+passed all five unit programs in each WASM configuration and native Debug,
+and Release WebKit passed 23 compiled shared-view checks. Release Chromium
+failed initial movement after a neutral generation change. Debug Chromium
+captured a four-second long task followed by `Receiver fell behind`. Both
+manual CI configurations still failed the intro's random binding. Those
+failures are retained; the final runtime adds the explicit random binding and
+full-receive-window interruption fixes above. No failed artifact is published.
 
 One diagnostic overlapped a lifecycle test during queue rearrangement. That pair
 and a loopback trial started during its cleanup remain in `invalid-overlap-*`
@@ -263,7 +299,9 @@ npm ci --prefix tools/web/coop --ignore-scripts
 node tools/web/coop/preview.mjs /path/to/complete/preview 0
 ```
 
-Open the printed host URL, tap Start, expand Private co-op and create a room.
+For the published build, open the
+[private HTTPS host](https://supertux-private-input-proof.jshbjnr.workers.dev/index.html?coop=1).
+For local testing, open the printed host URL. Tap Start, expand Private co-op and create a room.
 Open its Guest shared view invitation in another browser, wait for Player 2 to
 join, then select Play Welcome to Antarctica. The loopback server is a local
 preview; phones need the separately verified private HTTPS staging Worker.

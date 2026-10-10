@@ -2,7 +2,7 @@
   "schema": 1,
   "date_utc": "2026-10-10",
   "physical_device_tested": false,
-  "final_runtime": "0cfbc3038b80ab3d57dd0918bd987dce30b60f51",
+  "final_runtime": "7c7926478e40f24cf6bca972609f1a86ee5d1de4",
   "experiment": {
     "status": "rejected and rolled back; final pacing unchanged",
     "before_runtime": "9ebad10f32c039281b8b1db8779a5411673ee35a",
@@ -1151,17 +1151,168 @@
   },
   "startup_data_raw_bytes": 176669514,
   "deferred_music_raw_bytes": 150011881,
-  "exact_non_pr_validation_run": 38015347968,
-  "pr_validation_run": 38015352041,
+  "exact_non_pr_validation_run": 38016814903,
+  "pr_validation_run": 38016818646,
   "local_validation": {
     "complete_release_artifact": "verified",
     "complete_debug_artifact": "verified",
     "release_wasm_unit_tests": 5,
     "debug_wasm_unit_tests": 5,
     "native_debug_unit_tests": 5,
-    "loader_relay_shell_tests": 84,
+    "loader_relay_shell_tests": 85,
     "python_workflow_packaging_tests": 22,
-    "compiled_browser_acceptance": "See exact-source CI and PR results; pending when record was authored",
+    "compiled_browser_acceptance": "Exact-source focused Release/Debug CI and non-PR validation pass; ordinary local Release failure and manual attempt-1 failure retained separately.",
+    "physical_device_tested": false,
+    "release_chromium_touch_checks": 10,
+    "release_webkit_touch_checks": 10,
+    "release_webkit_shared_view_checks": 23,
+    "release_chromium_shared_view": {
+      "status": "failed",
+      "at": "growth pickup script fixture",
+      "host_long_task_ms": 4286,
+      "host_gap_ms": 4286.9,
+      "both_sockets_connected": true,
+      "guest_mask": 0,
+      "host_paused": true,
+      "permanent_loss": false,
+      "automatic_resume": false
+    },
+    "debug_chromium_shared_view_checks": 23,
+    "release_chromium_remote_input_checks": 18,
+    "debug_chromium_remote_input_checks": 18,
+    "release_chromium_diagnostic_shared_view_checks": 23,
+    "diagnostic_conditions": "Same source/assertions; CDP 1 ms sampling during campaign through growth pickup. This diagnostic pass does not replace the failed ordinary run.",
+    "earlier_growth_profile_attempt": "Failed after campaign screenshot before the profiling target; no CPU profile captured."
+  },
+  "pr_validation_status": "success: six required jobs",
+  "exact_non_pr_attempts": [
+    {
+      "attempt": 1,
+      "release": "failure: growth-pickup fixture, 2790 ms host gap; room recovered with neutral input and explicit Resume required",
+      "debug": "success"
+    },
+    {
+      "attempt": 2,
+      "release": "success",
+      "scope": "rerun failed job only, same source and assertions"
+    }
+  ],
+  "current_runtime_campaign_profile": {
+    "elapsed_ms": 58141.029,
+    "sampled_ms": 58138.921,
+    "top_self": [
+      {
+        "function": "(idle)",
+        "sampled_self_ms": 22385.8,
+        "url": ""
+      },
+      {
+        "function": "vertexAttribPointer",
+        "sampled_self_ms": 15906.5,
+        "url": ""
+      },
+      {
+        "function": "_emscripten_get_now",
+        "sampled_self_ms": 4399.8,
+        "url": "blob:http://127.0.0.1:45671/c7f76099-10d5-42e2-899a-065872d13bcd"
+      },
+      {
+        "function": "now",
+        "sampled_self_ms": 3372.0,
+        "url": ""
+      },
+      {
+        "function": "",
+        "sampled_self_ms": 2063.3,
+        "url": ""
+      },
+      {
+        "function": "drawArrays",
+        "sampled_self_ms": 1411.9,
+        "url": ""
+      },
+      {
+        "function": "(program)",
+        "sampled_self_ms": 1146.4,
+        "url": ""
+      },
+      {
+        "function": "wasm-to-js",
+        "sampled_self_ms": 818.3,
+        "url": ""
+      },
+      {
+        "function": "wasm-function[12819]",
+        "sampled_self_ms": 313.4,
+        "url": "wasm://wasm/023300a6"
+      },
+      {
+        "function": "stackSave",
+        "sampled_self_ms": 271.3,
+        "url": "blob:http://127.0.0.1:45671/c7f76099-10d5-42e2-899a-065872d13bcd"
+      },
+      {
+        "function": "UTF8ArrayToString",
+        "sampled_self_ms": 243.9,
+        "url": "blob:http://127.0.0.1:45671/c7f76099-10d5-42e2-899a-065872d13bcd"
+      },
+      {
+        "function": "wasm-function[3781]",
+        "sampled_self_ms": 240.1,
+        "url": "wasm://wasm/023300a6"
+      },
+      {
+        "function": "wasm-function[12624]",
+        "sampled_self_ms": 180.4,
+        "url": "wasm://wasm/023300a6"
+      },
+      {
+        "function": "bindTexture",
+        "sampled_self_ms": 176.1,
+        "url": ""
+      },
+      {
+        "function": "getWasmTableEntry",
+        "sampled_self_ms": 165.6,
+        "url": "blob:http://127.0.0.1:45671/c7f76099-10d5-42e2-899a-065872d13bcd"
+      },
+      {
+        "function": "send",
+        "sampled_self_ms": 156.9,
+        "url": ""
+      },
+      {
+        "function": "setTimeout",
+        "sampled_self_ms": 156.6,
+        "url": ""
+      },
+      {
+        "function": "browser_coop_view",
+        "sampled_self_ms": 149.9,
+        "url": "blob:http://127.0.0.1:45671/c7f76099-10d5-42e2-899a-065872d13bcd"
+      },
+      {
+        "function": "wasm-function[5232]",
+        "sampled_self_ms": 147.3,
+        "url": "wasm://wasm/023300a6"
+      },
+      {
+        "function": "send",
+        "sampled_self_ms": 131.9,
+        "url": "http://127.0.0.1:45671/coop.js"
+      }
+    ],
+    "scope": "Campaign selection through growth pickup; includes deliberate 3.2-second host stall, fixture setup and idle time; sampled self time, not exact CPU cost or physical-device performance."
+  },
+  "staging": {
+    "run": 38020319030,
+    "runtime": "7c7926478e40f24cf6bca972609f1a86ee5d1de4",
+    "artifact_validation_run": 38016814903,
+    "scope": "separate private co-op Worker only",
+    "url": "https://supertux-private-input-proof.jshbjnr.workers.dev/index.html?coop=1",
+    "publication": "completed",
+    "frontend_manifest_payload_readiness": "success",
+    "hosted_browser_reports": "See exact staging run and its retained Chromium/WebKit evidence",
     "physical_device_tested": false
   }
 }

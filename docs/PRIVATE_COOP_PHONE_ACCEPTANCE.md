@@ -1,42 +1,45 @@
 # Private co-op: HTTPS staging and phone acceptance
 
-Phase 7B is merged through [PR #14](https://github.com/jbbejena/supertux/pull/14),
-at `c385d97aba1476a984e497a33c1bd24183c55293` on `mobile-web-audit`.
-Its [supported-level handoff](PRIVATE_COOP_SUPPORTED_LEVEL.md) covers the original
-Welcome to Antarctica level. **The published URL below still serves Phase 7A**;
-merging code alone does not update that separately published staging Worker.
-Earlier Phase 7B/8A publication attempts were blocked by repository-wide
-Actions disablement (HTTP 422). Dispatch was accepted again on 2026-10-09.
-The supported-level runtime still needs an exact successful validation artifact
-and a separate staging publication; the old build-only preview on `master` does
-not publish private rooms. No production deployment is part of this work.
-Local measurements and staged implementation steps are in
-[PRIVATE_COOP_PHASE8.md](PRIVATE_COOP_PHASE8.md).
+The [private HTTPS host](https://supertux-private-input-proof.jshbjnr.workers.dev/index.html?coop=1)
+now serves recovery runtime `7c7926478e40f24cf6bca972609f1a86ee5d1de4`,
+based on merged Phase 8B at `0a240fc3445efd08610b9d66bf6b647a512fbfca`.
+It supports the original Welcome to Antarctica level and the static diagnostic
+arena, with smoother guest presentation, neutral shared pause, bounded socket
+recovery, trusted Resume and a save-preserving title restart. The
+[supported-level handoff](PRIVATE_COOP_SUPPORTED_LEVEL.md),
+[smoothing measurements](PRIVATE_COOP_SMOOTHING.md), and
+[recovery implementation and failures](PRIVATE_COOP_RECOVERY.md) describe scope.
+The implementation remains under review in
+[PR #17](https://github.com/jbbejena/supertux/pull/17).
 
-Phase 8B implements smoother guest movement/camera locally. Its exact runtime,
-equivalent comparisons and remaining acceptance gates are recorded in
-[PRIVATE_COOP_SMOOTHING.md](PRIVATE_COOP_SMOOTHING.md). It has not been published
-to the URL below.
-The subsequent [interruption recovery work](PRIVATE_COOP_RECOVERY.md), under
-[PR #17](https://github.com/jbbejena/supertux/pull/17), adds
-neutral shared pause, bounded socket recovery, trusted Resume and a
-save-preserving title restart. Physical acceptance of that runtime must include
-the brief-interruption and permanent-loss cases below.
+All six [focused PR checks](https://github.com/jbbejena/supertux/actions/runs/38016818646)
+pass for this runtime. The
+[non-PR exact-source WASM run](https://github.com/jbbejena/supertux/actions/runs/38016814903)
+passes Release/Debug after one failed-Release-job rerun on the identical source.
+The first Release attempt and ordinary local Chromium run failed after long host
+stalls; their authenticated rooms recovered with neutral input and stayed paused
+awaiting trusted Resume. Those failures remain recorded. They do not count as
+uninterrupted acceptance or establish physical-phone performance.
 
-Recovery runtime `0cfbc3038b80ab3d57dd0918bd987dce30b60f51` is under validation in
-[the exact-source WebAssembly run](https://github.com/jbbejena/supertux/actions/runs/38015347968).
-It is not published. Do not use that run for staging unless both configurations
-finish successfully. For a new runtime, run WebAssembly on the reviewed branch,
-then publish only its exact successful, non-PR validation artifact:
+The [separate staging run](https://github.com/jbbejena/supertux/actions/runs/38020319030)
+reuses that exact successful Release artifact; frontend/manifest/payload readiness
+has passed. Its retained Chromium/WebKit two-browser reports provide hosted
+acceptance status. Physical iPhone, Android and separate-network tests below
+remain unverified. No production publication or merge is part of this work.
+Normal Mobile Web Deploy does not enable the private rooms.
+
+To republish this tested runtime, use the complete source and successful run:
 
 ```sh
-gh workflow run wasm.yml --repo jbbejena/supertux --ref codex/private-coop-stall-recovery
-# Wait for both Release and Debug, then use their exact source and run identity:
 gh workflow run mobile-web-preview.yml --repo jbbejena/supertux \
   --ref codex/private-coop-stall-recovery \
-  -f ref=FULL_TESTED_RUNTIME_SHA -f validation_run_id=SUCCESSFUL_RUN_ID \
-  -f publish_coop=true
+  -f ref=7c7926478e40f24cf6bca972609f1a86ee5d1de4 \
+  -f validation_run_id=38016814903 -f publish_coop=true
 ```
+
+For a different runtime, first run `wasm.yml` on its reviewed branch and wait for
+both configurations. Supply its exact successful non-PR validation run; never
+use a build-only preview, PR artifact or unverified latest artifact.
 
 For Phase 7B phone acceptance, choose **Play Welcome to Antarctica** in step 3.
 Additionally verify coin pickup, enemy contact, growth, information panels,
@@ -75,7 +78,7 @@ the Worker, browser code and complete game artifact use the tested runtime. This
 allows publication tooling to be reviewed without rebuilding or changing that
 runtime. The build job contains no deployment secrets.
 
-For the validated merged Phase 7A runtime:
+The historical Phase 7A publication used:
 
 ```sh
 gh workflow run mobile-web-preview.yml --repo jbbejena/supertux \
