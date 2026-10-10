@@ -5,30 +5,35 @@ at `c385d97aba1476a984e497a33c1bd24183c55293` on `mobile-web-audit`.
 Its [supported-level handoff](PRIVATE_COOP_SUPPORTED_LEVEL.md) covers the original
 Welcome to Antarctica level. **The published URL below still serves Phase 7A**;
 merging code alone does not update that separately published staging Worker.
-On 2026-10-09, GitHub rejected workflow dispatch with HTTP 422,
-“Actions has been disabled for this repository.” CI and a new HTTPS publication
-require Actions to be re-enabled. No production deployment is part of Phase 7B.
-
-Phase 8A retried dispatch after that merge and received the same HTTP 422.
-The existing preview therefore remains Phase 7A. Local performance measurements
-and the next staged implementation steps are in
-[PRIVATE_COOP_PHASE8.md](PRIVATE_COOP_PHASE8.md). Workflow listings reporting
-`active` do not establish repository-wide Actions availability; the integration
-cannot inspect those permissions (HTTP 403).
+Earlier Phase 7B/8A publication attempts were blocked by repository-wide
+Actions disablement (HTTP 422). Dispatch was accepted again on 2026-10-09.
+The supported-level runtime still needs an exact successful validation artifact
+and a separate staging publication; the old build-only preview on `master` does
+not publish private rooms. No production deployment is part of this work.
+Local measurements and staged implementation steps are in
+[PRIVATE_COOP_PHASE8.md](PRIVATE_COOP_PHASE8.md).
 
 Phase 8B implements smoother guest movement/camera locally. Its exact runtime,
 equivalent comparisons and remaining acceptance gates are recorded in
 [PRIVATE_COOP_SMOOTHING.md](PRIVATE_COOP_SMOOTHING.md). It has not been published
 to the URL below.
+The subsequent [interruption recovery work](PRIVATE_COOP_RECOVERY.md), under
+[PR #17](https://github.com/jbbejena/supertux/pull/17), adds
+neutral shared pause, bounded socket recovery, trusted Resume and a
+save-preserving title restart. Physical acceptance of that runtime must include
+the brief-interruption and permanent-loss cases below.
 
-For the new runtime, first run the WebAssembly workflow on the reviewed branch,
+Recovery runtime `0cfbc3038b80ab3d57dd0918bd987dce30b60f51` is under validation in
+[the exact-source WebAssembly run](https://github.com/jbbejena/supertux/actions/runs/38015347968).
+It is not published. Do not use that run for staging unless both configurations
+finish successfully. For a new runtime, run WebAssembly on the reviewed branch,
 then publish only its exact successful, non-PR validation artifact:
 
 ```sh
-gh workflow run wasm.yml --repo jbbejena/supertux --ref mobile-web-audit
+gh workflow run wasm.yml --repo jbbejena/supertux --ref codex/private-coop-stall-recovery
 # Wait for both Release and Debug, then use their exact source and run identity:
 gh workflow run mobile-web-preview.yml --repo jbbejena/supertux \
-  --ref mobile-web-audit \
+  --ref codex/private-coop-stall-recovery \
   -f ref=FULL_TESTED_RUNTIME_SHA -f validation_run_id=SUCCESSFUL_RUN_ID \
   -f publish_coop=true
 ```
@@ -128,7 +133,7 @@ cache. Production saves are not imported. The entire room currently expires afte
 1. Phone A: use Start, expand **Private co-op**, then **Create room**.
 2. Share **Guest shared view** with Phone B. That invitation contains a temporary
    guest credential; keep it private. Wait for Player 2 to join.
-3. On the newly published Phase 7B runtime, Phone A chooses **Play Welcome to
+3. On the newly published supported-level runtime, Phone A chooses **Play Welcome to
    Antarctica**. Both screens should show the original level and both players.
    Phone A controls Player 1; Phone B controls Player 2. The older Phase 7A URL
    only offers **Start shared view proof**, a static diagnostic arena.
@@ -136,8 +141,14 @@ cache. Production saves are not imported. The entire room currently expires afte
    both living players remain visible through the native shared camera.
 5. Pause/resume on the host, rotate each phone, and inspect safe areas and control
    visibility. Release fingers before continuing; old held inputs must not replay.
-6. Background/lock each phone, lose and restore Wi-Fi, and try again. Recovery is
-   explicit: return the host to the title screen, rejoin, then restart the scene.
+6. Hold movement while briefly interrupting the host/connection. On the recovery
+   runtime, both players must stop, held fingers/keys must clear, and the game
+   must stay paused after the connection recovers. Release controls, then use
+   the host's trusted **Resume** button. Keep the co-op panel expanded once to
+   confirm it cannot cover Resume. A permanent loss (including guest backgrounding
+   or the bounded 15-second recovery timeout) blocks Resume: use **Return to
+   title**, create a new room and open its new invitation in the same guest tab.
+   The older runtime requires a title restart after any disconnect.
 7. Where death occurs, wait for **Tap Action** before ordinary respawn; all-player
    death must restart with fresh display state.
 8. Reload the host and confirm existing campaign saves/settings survive. The

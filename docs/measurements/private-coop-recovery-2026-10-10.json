@@ -1,0 +1,1167 @@
+{
+  "schema": 1,
+  "date_utc": "2026-10-10",
+  "physical_device_tested": false,
+  "final_runtime": "0cfbc3038b80ab3d57dd0918bd987dce30b60f51",
+  "experiment": {
+    "status": "rejected and rolled back; final pacing unchanged",
+    "before_runtime": "9ebad10f32c039281b8b1db8779a5411673ee35a",
+    "experimental_runtime": "df1fb8f121f1823abd4368bfd12638941f3dfb3a",
+    "change": "omit single-threaded SDL_Delay from the browser early-frame branch",
+    "cpu_quota": "400000 100000 (4 CPU)",
+    "profiles": {
+      "chromium-loopback": {
+        "before": {
+          "runtime": {
+            "configuration": "Release",
+            "inventorySha256": "f8ad2d221150bb9d6b80dda9dfe695ab5be9c5ee90d510889e557acddc94a22e",
+            "mode": "deferred-music",
+            "sourceCommit": "9ebad10f32c039281b8b1db8779a5411673ee35a",
+            "toolchain": "emscripten-6.0.11"
+          },
+          "transport": {
+            "name": "loopback",
+            "rtt_ms": 0,
+            "jitter_ms": 0,
+            "mbps": 0,
+            "scope": "ordered local WebSocket byte stream; HTTP assets unshaped"
+          },
+          "requested_trials": 3,
+          "completed_trials": 2,
+          "samples_per_trial": 10,
+          "summary": {
+            "input_to_first_draw_ms": {
+              "count": 20,
+              "median": 173.7,
+              "p95": 245.5,
+              "max": 531.2
+            },
+            "host_cold_ready_ms": {
+              "count": 2,
+              "median": 4917.03,
+              "p95": 5188.39,
+              "max": 5188.39
+            },
+            "host_warm_ready_ms": {
+              "count": 2,
+              "median": 11137.12,
+              "p95": 12301.58,
+              "max": 12301.58
+            },
+            "guest_cold_ready_ms": {
+              "count": 2,
+              "median": 10673.76,
+              "p95": 11460.57,
+              "max": 11460.57
+            },
+            "guest_warm_ready_ms": {
+              "count": 2,
+              "median": 6969.79,
+              "p95": 7211.6,
+              "max": 7211.6
+            },
+            "selection_to_ready_ms": {
+              "count": 2,
+              "median": 1053.22,
+              "p95": 1285.78,
+              "max": 1285.78
+            },
+            "input_samples": 20
+          },
+          "trials": [
+            {
+              "run": 1,
+              "browser": "151.0.7922.34",
+              "loading_ms": {
+                "host_cold_ready_ms": 5188.39,
+                "guest_cold_ready_ms": 9886.94,
+                "host_warm_ready_ms": 9972.67,
+                "guest_warm_ready_ms": 7211.6,
+                "selection_to_ready_ms": 820.67
+              },
+              "network": {
+                "host_cold": {
+                  "network_startup": {
+                    "backend_observed": true,
+                    "requests": 2,
+                    "response_body_bytes": 137499041
+                  }
+                },
+                "guest_cold": {
+                  "network_art": {
+                    "backend_observed": true,
+                    "requests": 1049,
+                    "response_body_bytes": 18637169
+                  }
+                },
+                "host_warm": {
+                  "network_startup": {
+                    "backend_observed": true,
+                    "requests": 0,
+                    "response_body_bytes": 0
+                  }
+                },
+                "guest_warm": {
+                  "network_art": {
+                    "backend_observed": true,
+                    "requests": 0,
+                    "response_body_bytes": 0
+                  }
+                }
+              },
+              "errors": []
+            },
+            {
+              "run": 3,
+              "browser": "151.0.7922.34",
+              "loading_ms": {
+                "host_cold_ready_ms": 4645.67,
+                "guest_cold_ready_ms": 11460.57,
+                "host_warm_ready_ms": 12301.58,
+                "guest_warm_ready_ms": 6727.98,
+                "selection_to_ready_ms": 1285.78
+              },
+              "network": {
+                "host_cold": {
+                  "network_startup": {
+                    "backend_observed": true,
+                    "requests": 2,
+                    "response_body_bytes": 137499041
+                  }
+                },
+                "guest_cold": {
+                  "network_art": {
+                    "backend_observed": true,
+                    "requests": 1049,
+                    "response_body_bytes": 18637169
+                  }
+                },
+                "host_warm": {
+                  "network_startup": {
+                    "backend_observed": true,
+                    "requests": 0,
+                    "response_body_bytes": 0
+                  }
+                },
+                "guest_warm": {
+                  "network_art": {
+                    "backend_observed": true,
+                    "requests": 0,
+                    "response_body_bytes": 0
+                  }
+                }
+              },
+              "errors": []
+            }
+          ],
+          "failures": [
+            {
+              "run": 2,
+              "stage": "sample 7 first draw",
+              "failure": "Page.wait_for_function: Timeout 10000ms exceeded.",
+              "partial_response_samples": 0,
+              "host": {
+                "status": "The host stopped updating. Controls were released. Press Resume when both players are ready."
+              },
+              "guest": {
+                "status": null
+              }
+            }
+          ]
+        },
+        "experimental": {
+          "runtime": {
+            "configuration": "Release",
+            "inventorySha256": "d52af84ea9a1c6f260c5f45408a82da28e97759d3f94a688bd1c13f582463a33",
+            "mode": "deferred-music",
+            "sourceCommit": "df1fb8f121f1823abd4368bfd12638941f3dfb3a",
+            "toolchain": "emscripten-6.0.11"
+          },
+          "transport": {
+            "name": "loopback",
+            "rtt_ms": 0,
+            "jitter_ms": 0,
+            "mbps": 0,
+            "scope": "ordered local WebSocket byte stream; HTTP assets unshaped"
+          },
+          "requested_trials": 3,
+          "completed_trials": 1,
+          "samples_per_trial": 10,
+          "summary": {
+            "input_to_first_draw_ms": {
+              "count": 10,
+              "median": 169.4,
+              "p95": 767.5,
+              "max": 767.5
+            },
+            "host_cold_ready_ms": {
+              "count": 1,
+              "median": 4252.44,
+              "p95": 4252.44,
+              "max": 4252.44
+            },
+            "host_warm_ready_ms": {
+              "count": 1,
+              "median": 12301.4,
+              "p95": 12301.4,
+              "max": 12301.4
+            },
+            "guest_cold_ready_ms": {
+              "count": 1,
+              "median": 9397.28,
+              "p95": 9397.28,
+              "max": 9397.28
+            },
+            "guest_warm_ready_ms": {
+              "count": 1,
+              "median": 9008.48,
+              "p95": 9008.48,
+              "max": 9008.48
+            },
+            "selection_to_ready_ms": {
+              "count": 1,
+              "median": 1001.08,
+              "p95": 1001.08,
+              "max": 1001.08
+            },
+            "input_samples": 10
+          },
+          "trials": [
+            {
+              "run": 1,
+              "browser": "151.0.7922.34",
+              "loading_ms": {
+                "host_cold_ready_ms": 4252.44,
+                "guest_cold_ready_ms": 9397.28,
+                "host_warm_ready_ms": 12301.4,
+                "guest_warm_ready_ms": 9008.48,
+                "selection_to_ready_ms": 1001.08
+              },
+              "network": {
+                "host_cold": {
+                  "network_startup": {
+                    "backend_observed": true,
+                    "requests": 2,
+                    "response_body_bytes": 137499033
+                  }
+                },
+                "guest_cold": {
+                  "network_art": {
+                    "backend_observed": true,
+                    "requests": 1049,
+                    "response_body_bytes": 18637169
+                  }
+                },
+                "host_warm": {
+                  "network_startup": {
+                    "backend_observed": true,
+                    "requests": 0,
+                    "response_body_bytes": 0
+                  }
+                },
+                "guest_warm": {
+                  "network_art": {
+                    "backend_observed": true,
+                    "requests": 0,
+                    "response_body_bytes": 0
+                  }
+                }
+              },
+              "errors": []
+            }
+          ],
+          "failures": [
+            {
+              "run": 2,
+              "stage": "sample 5 first draw",
+              "failure": "Page.wait_for_function: Timeout 10000ms exceeded.",
+              "partial_response_samples": 0,
+              "host": {
+                "status": "Connection recovered. Release controls, then press Resume on the host."
+              },
+              "guest": {
+                "status": null
+              }
+            },
+            {
+              "run": 3,
+              "stage": "sample 7 settling",
+              "failure": "Page.wait_for_function: Timeout 15000ms exceeded.",
+              "partial_response_samples": 0,
+              "host": {
+                "status": "Connection recovered. Release controls, then press Resume on the host."
+              },
+              "guest": {
+                "status": null
+              }
+            }
+          ]
+        }
+      },
+      "chromium-constrained": {
+        "before": {
+          "runtime": {
+            "configuration": "Release",
+            "inventorySha256": "f8ad2d221150bb9d6b80dda9dfe695ab5be9c5ee90d510889e557acddc94a22e",
+            "mode": "deferred-music",
+            "sourceCommit": "9ebad10f32c039281b8b1db8779a5411673ee35a",
+            "toolchain": "emscripten-6.0.11"
+          },
+          "transport": {
+            "name": "constrained",
+            "rtt_ms": 150,
+            "jitter_ms": 30,
+            "mbps": 5,
+            "scope": "ordered local WebSocket byte stream; HTTP assets unshaped"
+          },
+          "requested_trials": 3,
+          "completed_trials": 0,
+          "samples_per_trial": 10,
+          "summary": {},
+          "trials": [],
+          "failures": [
+            {
+              "run": 1,
+              "stage": "sample 1 first draw",
+              "failure": "Page.wait_for_function: Timeout 10000ms exceeded.",
+              "partial_response_samples": 0,
+              "host": {
+                "status": "Player 2 input active. Host owns the game and saves."
+              },
+              "guest": {
+                "status": null
+              }
+            },
+            {
+              "run": 2,
+              "stage": "sample 8 first draw",
+              "failure": "Page.wait_for_function: Timeout 10000ms exceeded.",
+              "partial_response_samples": 0,
+              "host": {
+                "status": "The host stopped updating. Controls were released. Press Resume when both players are ready."
+              },
+              "guest": {
+                "status": null
+              }
+            },
+            {
+              "run": 3,
+              "stage": "sample 5 first draw",
+              "failure": "Page.wait_for_function: Timeout 10000ms exceeded.",
+              "partial_response_samples": 0,
+              "host": {
+                "status": "Connection recovered. Release controls, then press Resume on the host."
+              },
+              "guest": {
+                "status": null
+              }
+            }
+          ]
+        },
+        "experimental": {
+          "runtime": {
+            "configuration": "Release",
+            "inventorySha256": "d52af84ea9a1c6f260c5f45408a82da28e97759d3f94a688bd1c13f582463a33",
+            "mode": "deferred-music",
+            "sourceCommit": "df1fb8f121f1823abd4368bfd12638941f3dfb3a",
+            "toolchain": "emscripten-6.0.11"
+          },
+          "transport": {
+            "name": "constrained",
+            "rtt_ms": 150,
+            "jitter_ms": 30,
+            "mbps": 5,
+            "scope": "ordered local WebSocket byte stream; HTTP assets unshaped"
+          },
+          "requested_trials": 3,
+          "completed_trials": 0,
+          "samples_per_trial": 10,
+          "summary": {},
+          "trials": [],
+          "failures": [
+            {
+              "run": 1,
+              "stage": "sample 4 first draw",
+              "failure": "Page.wait_for_function: Timeout 10000ms exceeded.",
+              "partial_response_samples": 0,
+              "host": {
+                "status": "Connection interrupted. Controls are released. Wait for recovery, then press Resume."
+              },
+              "guest": {
+                "status": null
+              }
+            },
+            {
+              "run": 2,
+              "stage": "sample 2 first draw",
+              "failure": "Page.wait_for_function: Timeout 10000ms exceeded.",
+              "partial_response_samples": 0,
+              "host": {
+                "status": "Connection recovered. Release controls, then press Resume on the host."
+              },
+              "guest": {
+                "status": null
+              }
+            },
+            {
+              "run": 3,
+              "stage": "sample 4 first draw",
+              "failure": "Page.wait_for_function: Timeout 10000ms exceeded.",
+              "partial_response_samples": 0,
+              "host": {
+                "status": "Connection recovered. Release controls, then press Resume on the host."
+              },
+              "guest": {
+                "status": null
+              }
+            }
+          ]
+        }
+      },
+      "webkit-loopback": {
+        "before": {
+          "runtime": {
+            "configuration": "Release",
+            "inventorySha256": "f8ad2d221150bb9d6b80dda9dfe695ab5be9c5ee90d510889e557acddc94a22e",
+            "mode": "deferred-music",
+            "sourceCommit": "9ebad10f32c039281b8b1db8779a5411673ee35a",
+            "toolchain": "emscripten-6.0.11"
+          },
+          "transport": {
+            "name": "loopback",
+            "rtt_ms": 0,
+            "jitter_ms": 0,
+            "mbps": 0,
+            "scope": "ordered local WebSocket byte stream; HTTP assets unshaped"
+          },
+          "requested_trials": 3,
+          "completed_trials": 3,
+          "samples_per_trial": 10,
+          "summary": {
+            "input_to_first_draw_ms": {
+              "count": 30,
+              "median": 143.0,
+              "p95": 235,
+              "max": 302
+            },
+            "host_cold_ready_ms": {
+              "count": 3,
+              "median": 9015.06,
+              "p95": 51462.45,
+              "max": 51462.45
+            },
+            "host_warm_ready_ms": {
+              "count": 3,
+              "median": 3338.8,
+              "p95": 3754.35,
+              "max": 3754.35
+            },
+            "guest_cold_ready_ms": {
+              "count": 3,
+              "median": 16826.49,
+              "p95": 17799.36,
+              "max": 17799.36
+            },
+            "guest_warm_ready_ms": {
+              "count": 3,
+              "median": 13745.02,
+              "p95": 14591.91,
+              "max": 14591.91
+            },
+            "selection_to_ready_ms": {
+              "count": 3,
+              "median": 610.06,
+              "p95": 626.09,
+              "max": 626.09
+            },
+            "input_samples": 30
+          },
+          "trials": [
+            {
+              "run": 1,
+              "browser": "26.5",
+              "loading_ms": {
+                "host_cold_ready_ms": 8256.63,
+                "guest_cold_ready_ms": 17799.36,
+                "host_warm_ready_ms": 3338.8,
+                "guest_warm_ready_ms": 12755.79,
+                "selection_to_ready_ms": 610.06
+              },
+              "network": {
+                "host_cold": {
+                  "network_startup": {
+                    "backend_observed": true,
+                    "requests": 2,
+                    "response_body_bytes": 137499041
+                  }
+                },
+                "guest_cold": {
+                  "network_art": {
+                    "backend_observed": true,
+                    "requests": 1049,
+                    "response_body_bytes": 18637169
+                  }
+                },
+                "host_warm": {
+                  "network_startup": {
+                    "backend_observed": true,
+                    "requests": 0,
+                    "response_body_bytes": 0
+                  }
+                },
+                "guest_warm": {
+                  "network_art": {
+                    "backend_observed": true,
+                    "requests": 0,
+                    "response_body_bytes": 0
+                  }
+                }
+              },
+              "errors": []
+            },
+            {
+              "run": 2,
+              "browser": "26.5",
+              "loading_ms": {
+                "host_cold_ready_ms": 51462.45,
+                "guest_cold_ready_ms": 16241.95,
+                "host_warm_ready_ms": 3754.35,
+                "guest_warm_ready_ms": 14591.91,
+                "selection_to_ready_ms": 589.09
+              },
+              "network": {
+                "host_cold": {
+                  "network_startup": {
+                    "backend_observed": true,
+                    "requests": 2,
+                    "response_body_bytes": 137499041
+                  }
+                },
+                "guest_cold": {
+                  "network_art": {
+                    "backend_observed": true,
+                    "requests": 1049,
+                    "response_body_bytes": 18637169
+                  }
+                },
+                "host_warm": {
+                  "network_startup": {
+                    "backend_observed": true,
+                    "requests": 0,
+                    "response_body_bytes": 0
+                  }
+                },
+                "guest_warm": {
+                  "network_art": {
+                    "backend_observed": true,
+                    "requests": 0,
+                    "response_body_bytes": 0
+                  }
+                }
+              },
+              "errors": []
+            },
+            {
+              "run": 3,
+              "browser": "26.5",
+              "loading_ms": {
+                "host_cold_ready_ms": 9015.06,
+                "guest_cold_ready_ms": 16826.49,
+                "host_warm_ready_ms": 3322.31,
+                "guest_warm_ready_ms": 13745.02,
+                "selection_to_ready_ms": 626.09
+              },
+              "network": {
+                "host_cold": {
+                  "network_startup": {
+                    "backend_observed": true,
+                    "requests": 2,
+                    "response_body_bytes": 137499041
+                  }
+                },
+                "guest_cold": {
+                  "network_art": {
+                    "backend_observed": true,
+                    "requests": 1049,
+                    "response_body_bytes": 18637169
+                  }
+                },
+                "host_warm": {
+                  "network_startup": {
+                    "backend_observed": true,
+                    "requests": 0,
+                    "response_body_bytes": 0
+                  }
+                },
+                "guest_warm": {
+                  "network_art": {
+                    "backend_observed": true,
+                    "requests": 0,
+                    "response_body_bytes": 0
+                  }
+                }
+              },
+              "errors": []
+            }
+          ],
+          "failures": []
+        },
+        "experimental": {
+          "runtime": {
+            "configuration": "Release",
+            "inventorySha256": "d52af84ea9a1c6f260c5f45408a82da28e97759d3f94a688bd1c13f582463a33",
+            "mode": "deferred-music",
+            "sourceCommit": "df1fb8f121f1823abd4368bfd12638941f3dfb3a",
+            "toolchain": "emscripten-6.0.11"
+          },
+          "transport": {
+            "name": "loopback",
+            "rtt_ms": 0,
+            "jitter_ms": 0,
+            "mbps": 0,
+            "scope": "ordered local WebSocket byte stream; HTTP assets unshaped"
+          },
+          "requested_trials": 3,
+          "completed_trials": 1,
+          "samples_per_trial": 10,
+          "summary": {
+            "input_to_first_draw_ms": {
+              "count": 10,
+              "median": 141.5,
+              "p95": 170,
+              "max": 170
+            },
+            "host_cold_ready_ms": {
+              "count": 1,
+              "median": 54300.59,
+              "p95": 54300.59,
+              "max": 54300.59
+            },
+            "host_warm_ready_ms": {
+              "count": 1,
+              "median": 3787.89,
+              "p95": 3787.89,
+              "max": 3787.89
+            },
+            "guest_cold_ready_ms": {
+              "count": 1,
+              "median": 43004.11,
+              "p95": 43004.11,
+              "max": 43004.11
+            },
+            "guest_warm_ready_ms": {
+              "count": 1,
+              "median": 15070.67,
+              "p95": 15070.67,
+              "max": 15070.67
+            },
+            "selection_to_ready_ms": {
+              "count": 1,
+              "median": 678.99,
+              "p95": 678.99,
+              "max": 678.99
+            },
+            "input_samples": 10
+          },
+          "trials": [
+            {
+              "run": 2,
+              "browser": "26.5",
+              "loading_ms": {
+                "host_cold_ready_ms": 54300.59,
+                "guest_cold_ready_ms": 43004.11,
+                "host_warm_ready_ms": 3787.89,
+                "guest_warm_ready_ms": 15070.67,
+                "selection_to_ready_ms": 678.99
+              },
+              "network": {
+                "host_cold": {
+                  "network_startup": {
+                    "backend_observed": true,
+                    "requests": 2,
+                    "response_body_bytes": 137499033
+                  }
+                },
+                "guest_cold": {
+                  "network_art": {
+                    "backend_observed": true,
+                    "requests": 1049,
+                    "response_body_bytes": 18637169
+                  }
+                },
+                "host_warm": {
+                  "network_startup": {
+                    "backend_observed": true,
+                    "requests": 0,
+                    "response_body_bytes": 0
+                  }
+                },
+                "guest_warm": {
+                  "network_art": {
+                    "backend_observed": true,
+                    "requests": 0,
+                    "response_body_bytes": 0
+                  }
+                }
+              },
+              "errors": []
+            }
+          ],
+          "failures": [
+            {
+              "run": 1,
+              "stage": "measurement fixture",
+              "failure": "Measurement fixture was not consumed",
+              "partial_response_samples": 0,
+              "host": {
+                "status": "Connection recovered. Release controls, then press Resume on the host."
+              },
+              "guest": {
+                "status": null
+              }
+            },
+            {
+              "run": 3,
+              "stage": "sample 8 settling",
+              "failure": "Page.wait_for_function: Timeout 15000ms exceeded.",
+              "partial_response_samples": 0,
+              "host": {
+                "status": "Connection recovered. Release controls, then press Resume on the host."
+              },
+              "guest": {
+                "status": null
+              }
+            }
+          ]
+        }
+      },
+      "webkit-constrained": {
+        "before": {
+          "runtime": {
+            "configuration": "Release",
+            "inventorySha256": "f8ad2d221150bb9d6b80dda9dfe695ab5be9c5ee90d510889e557acddc94a22e",
+            "mode": "deferred-music",
+            "sourceCommit": "9ebad10f32c039281b8b1db8779a5411673ee35a",
+            "toolchain": "emscripten-6.0.11"
+          },
+          "transport": {
+            "name": "constrained",
+            "rtt_ms": 150,
+            "jitter_ms": 30,
+            "mbps": 5,
+            "scope": "ordered local WebSocket byte stream; HTTP assets unshaped"
+          },
+          "requested_trials": 3,
+          "completed_trials": 3,
+          "samples_per_trial": 10,
+          "summary": {
+            "input_to_first_draw_ms": {
+              "count": 30,
+              "median": 420.0,
+              "p95": 496,
+              "max": 499
+            },
+            "host_cold_ready_ms": {
+              "count": 3,
+              "median": 7517.42,
+              "p95": 7886.79,
+              "max": 7886.79
+            },
+            "host_warm_ready_ms": {
+              "count": 3,
+              "median": 3595.18,
+              "p95": 3678.41,
+              "max": 3678.41
+            },
+            "guest_cold_ready_ms": {
+              "count": 3,
+              "median": 17821.82,
+              "p95": 17919.51,
+              "max": 17919.51
+            },
+            "guest_warm_ready_ms": {
+              "count": 3,
+              "median": 12951.23,
+              "p95": 13178.87,
+              "max": 13178.87
+            },
+            "selection_to_ready_ms": {
+              "count": 3,
+              "median": 1117.63,
+              "p95": 1616.6,
+              "max": 1616.6
+            },
+            "input_samples": 30
+          },
+          "trials": [
+            {
+              "run": 1,
+              "browser": "26.5",
+              "loading_ms": {
+                "host_cold_ready_ms": 7517.42,
+                "guest_cold_ready_ms": 17919.51,
+                "host_warm_ready_ms": 3436.88,
+                "guest_warm_ready_ms": 13178.87,
+                "selection_to_ready_ms": 1033.53
+              },
+              "network": {
+                "host_cold": {
+                  "network_startup": {
+                    "backend_observed": true,
+                    "requests": 2,
+                    "response_body_bytes": 137499041
+                  }
+                },
+                "guest_cold": {
+                  "network_art": {
+                    "backend_observed": true,
+                    "requests": 1049,
+                    "response_body_bytes": 18637169
+                  }
+                },
+                "host_warm": {
+                  "network_startup": {
+                    "backend_observed": true,
+                    "requests": 0,
+                    "response_body_bytes": 0
+                  }
+                },
+                "guest_warm": {
+                  "network_art": {
+                    "backend_observed": true,
+                    "requests": 0,
+                    "response_body_bytes": 0
+                  }
+                }
+              },
+              "errors": []
+            },
+            {
+              "run": 2,
+              "browser": "26.5",
+              "loading_ms": {
+                "host_cold_ready_ms": 7315.83,
+                "guest_cold_ready_ms": 17821.82,
+                "host_warm_ready_ms": 3595.18,
+                "guest_warm_ready_ms": 12893.87,
+                "selection_to_ready_ms": 1616.6
+              },
+              "network": {
+                "host_cold": {
+                  "network_startup": {
+                    "backend_observed": true,
+                    "requests": 2,
+                    "response_body_bytes": 137499041
+                  }
+                },
+                "guest_cold": {
+                  "network_art": {
+                    "backend_observed": true,
+                    "requests": 1049,
+                    "response_body_bytes": 18637169
+                  }
+                },
+                "host_warm": {
+                  "network_startup": {
+                    "backend_observed": true,
+                    "requests": 0,
+                    "response_body_bytes": 0
+                  }
+                },
+                "guest_warm": {
+                  "network_art": {
+                    "backend_observed": true,
+                    "requests": 0,
+                    "response_body_bytes": 0
+                  }
+                }
+              },
+              "errors": []
+            },
+            {
+              "run": 3,
+              "browser": "26.5",
+              "loading_ms": {
+                "host_cold_ready_ms": 7886.79,
+                "guest_cold_ready_ms": 16063.12,
+                "host_warm_ready_ms": 3678.41,
+                "guest_warm_ready_ms": 12951.23,
+                "selection_to_ready_ms": 1117.63
+              },
+              "network": {
+                "host_cold": {
+                  "network_startup": {
+                    "backend_observed": true,
+                    "requests": 2,
+                    "response_body_bytes": 137499041
+                  }
+                },
+                "guest_cold": {
+                  "network_art": {
+                    "backend_observed": true,
+                    "requests": 1049,
+                    "response_body_bytes": 18637169
+                  }
+                },
+                "host_warm": {
+                  "network_startup": {
+                    "backend_observed": true,
+                    "requests": 0,
+                    "response_body_bytes": 0
+                  }
+                },
+                "guest_warm": {
+                  "network_art": {
+                    "backend_observed": true,
+                    "requests": 0,
+                    "response_body_bytes": 0
+                  }
+                }
+              },
+              "errors": []
+            }
+          ],
+          "failures": []
+        },
+        "experimental": {
+          "runtime": {
+            "configuration": "Release",
+            "inventorySha256": "d52af84ea9a1c6f260c5f45408a82da28e97759d3f94a688bd1c13f582463a33",
+            "mode": "deferred-music",
+            "sourceCommit": "df1fb8f121f1823abd4368bfd12638941f3dfb3a",
+            "toolchain": "emscripten-6.0.11"
+          },
+          "transport": {
+            "name": "constrained",
+            "rtt_ms": 150,
+            "jitter_ms": 30,
+            "mbps": 5,
+            "scope": "ordered local WebSocket byte stream; HTTP assets unshaped"
+          },
+          "requested_trials": 3,
+          "completed_trials": 3,
+          "samples_per_trial": 10,
+          "summary": {
+            "input_to_first_draw_ms": {
+              "count": 30,
+              "median": 431.0,
+              "p95": 504,
+              "max": 508
+            },
+            "host_cold_ready_ms": {
+              "count": 3,
+              "median": 8035.12,
+              "p95": 11276.42,
+              "max": 11276.42
+            },
+            "host_warm_ready_ms": {
+              "count": 3,
+              "median": 3709.32,
+              "p95": 3869.88,
+              "max": 3869.88
+            },
+            "guest_cold_ready_ms": {
+              "count": 3,
+              "median": 17975.59,
+              "p95": 18542.07,
+              "max": 18542.07
+            },
+            "guest_warm_ready_ms": {
+              "count": 3,
+              "median": 15584.36,
+              "p95": 17251.92,
+              "max": 17251.92
+            },
+            "selection_to_ready_ms": {
+              "count": 3,
+              "median": 1092.41,
+              "p95": 1109.43,
+              "max": 1109.43
+            },
+            "input_samples": 30
+          },
+          "trials": [
+            {
+              "run": 1,
+              "browser": "26.5",
+              "loading_ms": {
+                "host_cold_ready_ms": 11276.42,
+                "guest_cold_ready_ms": 18542.07,
+                "host_warm_ready_ms": 3869.88,
+                "guest_warm_ready_ms": 15507.03,
+                "selection_to_ready_ms": 1092.41
+              },
+              "network": {
+                "host_cold": {
+                  "network_startup": {
+                    "backend_observed": true,
+                    "requests": 2,
+                    "response_body_bytes": 137499033
+                  }
+                },
+                "guest_cold": {
+                  "network_art": {
+                    "backend_observed": true,
+                    "requests": 1049,
+                    "response_body_bytes": 18637169
+                  }
+                },
+                "host_warm": {
+                  "network_startup": {
+                    "backend_observed": true,
+                    "requests": 0,
+                    "response_body_bytes": 0
+                  }
+                },
+                "guest_warm": {
+                  "network_art": {
+                    "backend_observed": true,
+                    "requests": 0,
+                    "response_body_bytes": 0
+                  }
+                }
+              },
+              "errors": []
+            },
+            {
+              "run": 2,
+              "browser": "26.5",
+              "loading_ms": {
+                "host_cold_ready_ms": 8035.12,
+                "guest_cold_ready_ms": 17007.4,
+                "host_warm_ready_ms": 3709.32,
+                "guest_warm_ready_ms": 17251.92,
+                "selection_to_ready_ms": 1109.43
+              },
+              "network": {
+                "host_cold": {
+                  "network_startup": {
+                    "backend_observed": true,
+                    "requests": 2,
+                    "response_body_bytes": 137499033
+                  }
+                },
+                "guest_cold": {
+                  "network_art": {
+                    "backend_observed": true,
+                    "requests": 1049,
+                    "response_body_bytes": 18637169
+                  }
+                },
+                "host_warm": {
+                  "network_startup": {
+                    "backend_observed": true,
+                    "requests": 0,
+                    "response_body_bytes": 0
+                  }
+                },
+                "guest_warm": {
+                  "network_art": {
+                    "backend_observed": true,
+                    "requests": 0,
+                    "response_body_bytes": 0
+                  }
+                }
+              },
+              "errors": []
+            },
+            {
+              "run": 3,
+              "browser": "26.5",
+              "loading_ms": {
+                "host_cold_ready_ms": 7983.46,
+                "guest_cold_ready_ms": 17975.59,
+                "host_warm_ready_ms": 3607.87,
+                "guest_warm_ready_ms": 15584.36,
+                "selection_to_ready_ms": 1086.86
+              },
+              "network": {
+                "host_cold": {
+                  "network_startup": {
+                    "backend_observed": true,
+                    "requests": 2,
+                    "response_body_bytes": 137499033
+                  }
+                },
+                "guest_cold": {
+                  "network_art": {
+                    "backend_observed": true,
+                    "requests": 1049,
+                    "response_body_bytes": 18637169
+                  }
+                },
+                "host_warm": {
+                  "network_startup": {
+                    "backend_observed": true,
+                    "requests": 0,
+                    "response_body_bytes": 0
+                  }
+                },
+                "guest_warm": {
+                  "network_art": {
+                    "backend_observed": true,
+                    "requests": 0,
+                    "response_body_bytes": 0
+                  }
+                }
+              },
+              "errors": []
+            }
+          ],
+          "failures": []
+        }
+      }
+    },
+    "conditions": {
+      "viewport": {
+        "width": 844,
+        "height": 390
+      },
+      "device_scale_factor": 1,
+      "has_touch": true,
+      "separate_browser_processes": true,
+      "fresh_profiles_per_run": true,
+      "host_cpu_profiling": false,
+      "browser_profile": "persistent temporary profiles",
+      "host_http_cache": "disabled by developer HTML route; warm persistent asset store retained",
+      "guest_http_cache": "enabled, cold fresh context then warm page in same context",
+      "render_endpoint": "authoritative drawn-state change observed after Canvas2D callback; not hardware photon timing",
+      "statistics": "median and nearest-rank p95 of completed trials; failed trials retained separately"
+    },
+    "measurement_tool_sha256": {
+      "tests/wasm/coop_benchmark.py": "9f6665b228b0f5bc55aeb419e584e2132bd2de014add7251b6e96dbb86662de7",
+      "tools/web/coop_metrics.py": "74fd33304799bb9d8b32e56e402b684b51d706d49630a52bd06014e2ad845602",
+      "tools/web/coop/relay_proxy.mjs": "17f2e735ed3fcc2b83e4a948fb80562d3d6534d178901c53dddf8a138caad028"
+    }
+  },
+  "limitations": [
+    "Software rendering in Linux Chromium/WebKit, no physical phone or WAN test",
+    "Completed trials only in aggregates; all failures retained",
+    "Warm means a new page with the same persistent browser profile, not a restarted browser",
+    "No final-runtime performance improvement claimed",
+    "Invalid overlapped diagnostic and lifecycle attempts excluded"
+  ],
+  "diagnostic_clock_sampled_self_ms": {
+    "before": 2719.865,
+    "experimental": 34.817,
+    "before_profile_ms": 28767.179,
+    "experimental_profile_ms": 27968.37,
+    "both_trials_failed": true,
+    "warning": "Sampled self time, not a successful gameplay/FPS comparison"
+  },
+  "startup_data_raw_bytes": 176669514,
+  "deferred_music_raw_bytes": 150011881,
+  "exact_non_pr_validation_run": 38015347968,
+  "pr_validation_run": 38015352041,
+  "local_validation": {
+    "complete_release_artifact": "verified",
+    "complete_debug_artifact": "verified",
+    "release_wasm_unit_tests": 5,
+    "debug_wasm_unit_tests": 5,
+    "native_debug_unit_tests": 5,
+    "loader_relay_shell_tests": 84,
+    "python_workflow_packaging_tests": 22,
+    "compiled_browser_acceptance": "See exact-source CI and PR results; pending when record was authored",
+    "physical_device_tested": false
+  }
+}
