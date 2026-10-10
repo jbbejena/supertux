@@ -36,6 +36,21 @@ GLVertexArrays::GLVertexArrays(GL33CoreContext& context) :
   glGenBuffers(1, &m_texcoords_buffer);
   glGenBuffers(1, &m_color_buffer);
 
+#ifdef __EMSCRIPTEN__
+  // This VAO and its program/buffers live together. BufferData replaces the
+  // contents, not the attribute binding; repeating the layout on each draw
+  // needlessly resubmits WebGL state (costly on software renderers).
+  glBindVertexArray(m_vao);
+  glBindBuffer(GL_ARRAY_BUFFER, m_positions_buffer);
+  glVertexAttribPointer(m_context.get_program().get_position_location(), 2, GL_FLOAT, GL_FALSE, 0, nullptr);
+  glBindBuffer(GL_ARRAY_BUFFER, m_texcoords_buffer);
+  glVertexAttribPointer(m_context.get_program().get_texcoord_location(), 2, GL_FLOAT, GL_FALSE, 0, nullptr);
+  glBindBuffer(GL_ARRAY_BUFFER, m_color_buffer);
+  glVertexAttribPointer(m_context.get_program().get_diffuse_location(), 4, GL_FLOAT, GL_FALSE, 0, nullptr);
+  glBindVertexArray(0);
+  glBindBuffer(GL_ARRAY_BUFFER, 0);
+#endif
+
   assert_gl();
 }
 
@@ -66,7 +81,9 @@ GLVertexArrays::set_positions(const float* data, size_t size)
   glBufferData(GL_ARRAY_BUFFER, size, data, GL_DYNAMIC_DRAW);
 
   int loc = m_context.get_program().get_position_location();
+#ifndef __EMSCRIPTEN__
   glVertexAttribPointer(loc, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
+#endif
   glEnableVertexAttribArray(loc);
 
   assert_gl();
@@ -81,7 +98,9 @@ GLVertexArrays::set_texcoords(const float* data, size_t size)
   glBufferData(GL_ARRAY_BUFFER, size, data, GL_DYNAMIC_DRAW);
 
   int loc = m_context.get_program().get_texcoord_location();
+#ifndef __EMSCRIPTEN__
   glVertexAttribPointer(loc, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
+#endif
   glEnableVertexAttribArray(loc);
 
   assert_gl();
@@ -108,7 +127,9 @@ GLVertexArrays::set_colors(const float* data, size_t size)
   glBufferData(GL_ARRAY_BUFFER, size, data, GL_DYNAMIC_DRAW);
 
   int loc = m_context.get_program().get_diffuse_location();
+#ifndef __EMSCRIPTEN__
   glVertexAttribPointer(loc, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
+#endif
   glEnableVertexAttribArray(loc);
 
   assert_gl();
