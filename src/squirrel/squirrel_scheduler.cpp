@@ -40,6 +40,10 @@ SquirrelScheduler::update(float time)
            Level::current()->m_skip_cutscene)))
   {
     HSQOBJECT thread_ref = schedule.front().thread_ref;
+    // Waking a script can schedule more threads and reorder the heap. Retire
+    // this entry before that callback, keeping its reference alive until done.
+    std::pop_heap(schedule.begin(), schedule.end());
+    schedule.pop_back();
 
     sq_pushobject(m_vm.getHandle(), thread_ref);
     sq_getweakrefval(m_vm.getHandle(), -1);
@@ -66,8 +70,6 @@ SquirrelScheduler::update(float time)
     sq_release(m_vm.getHandle(), &thread_ref);
     sq_pop(m_vm.getHandle(), 2);
 
-    std::pop_heap(schedule.begin(), schedule.end());
-    schedule.pop_back();
   }
 }
 

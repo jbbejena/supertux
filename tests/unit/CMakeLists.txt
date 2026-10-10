@@ -38,6 +38,12 @@ make_unit_test(RemoteControllerTest SOURCE remote_controller_test.cpp
   EXTERNAL control/controller.cpp control/remote_controller.cpp
   INCLUDES ${CMAKE_BINARY_DIR})
 
+make_unit_test(SquirrelSchedulerTest SOURCE squirrel_scheduler_test.cpp
+  EXTERNAL squirrel/squirrel_scheduler.cpp video/color.cpp
+  LIBRARIES simplesquirrel_static SDL3 glm
+  INCLUDES ${CMAKE_BINARY_DIR}
+    ${SUPERTUX_SOURCE_DIR}/external/simplesquirrel/libs/squirrel/include)
+
 message("ALL TESTS: ${all_test_targets}")
 
 add_custom_target(supertux-unit-tests
