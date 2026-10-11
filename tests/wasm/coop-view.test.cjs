@@ -134,7 +134,7 @@ test('guest renders native faded colors once while texture and text keep their s
   const manifest=Buffer.from(JSON.stringify({frontend:{'coop-scene.json':entry(scene),[url]:entry(bytes)}}));
   const files=new Map([['manifest.json',manifest],['coop-scene.json',scene],[url,bytes]]);
   const browser={document:{getElementById:id=>id==='guest_canvas'?canvas:{textContent:''}},
-    crypto:webcrypto,TextEncoder,TextDecoder,Blob,URL,AbortSignal,performance,console,
+    crypto:webcrypto,TextEncoder,TextDecoder,Blob,URL,AbortSignal,AbortController,performance,console,
     Image:class {constructor(){this.width=this.height=32;}async decode(){}},requestAnimationFrame(){},
     fetch:async name=>({ok:true,arrayBuffer:async()=>Uint8Array.from(files.get(name)).buffer})};
   vm.runInNewContext(fs.readFileSync(require.resolve('../../mk/emscripten/coop-view.js'),'utf8'),browser);
@@ -150,4 +150,57 @@ test('guest renders native faded colors once while texture and text keep their s
   assert.equal(browser.SupertuxView.accept(frame(1,100,0,{generation:0,scene:'antarctica-v1',world:{draw:commands}})),true);
   assert.deepEqual(calls,[['texture',.2],['panel',1,'rgba(255,255,255,0.2)'],
     ['line',1,'rgba(255,255,255,0.25)'],['gradient',1],['text',.5,'rgba(255,255,255,0.4)']]);
+});
+
+function preparationFixture() {
+  const entry=data=>({bytes:data.length,sha256:createHash('sha256').update(data).digest('hex')});
+  const art=Array.from({length:8},(_,i)=>Buffer.from('image-'+i));
+  const urls=art.map(bytes=>'coop-art/'+entry(bytes).sha256+'.png');
+  const scene=Buffer.from(JSON.stringify({schema:1,id:'coop-view-v1',tileImage:urls[0],actions:{},campaign:{textures:Object.fromEntries(urls.map((url,i)=>['image-'+i,url]))}}));
+  const manifest=Buffer.from(JSON.stringify({frontend:{'coop-scene.json':entry(scene),...Object.fromEntries(urls.map((url,i)=>[url,entry(art[i])]))}}));
+  const files=new Map([['manifest.json',manifest],['coop-scene.json',scene],...urls.map((url,i)=>[url,art[i]])]);
+  const stats={active:0,maximum:0,requests:0,corrupt:false,hold:false};
+  const browser={document:{getElementById:id=>id==='guest_canvas'?{style:{},getContext:()=>({clearRect(){}})}:{textContent:''}},
+    crypto:webcrypto,TextEncoder,TextDecoder,Blob,URL,AbortSignal,AbortController,performance,console,
+    Image:class {async decode(){}},requestAnimationFrame(){},
+    async fetch(name,{signal}) {
+      if (name.startsWith('coop-art/')) {
+        ++stats.requests;++stats.active;stats.maximum=Math.max(stats.maximum,stats.active);
+        try {
+          await new Promise((resolve,reject)=>{
+            let timer;
+            const abort=()=>{clearTimeout(timer);reject(signal.reason);};
+            const done=()=>{signal.removeEventListener('abort',abort);resolve();};
+            signal.addEventListener('abort',abort,{once:true});
+            if (!stats.hold) timer=setTimeout(done,5);
+          });
+        } finally {--stats.active;}
+      }
+      const bytes=stats.corrupt && name===urls[0] ? Buffer.from('partial') : files.get(name);
+      return {ok:true,arrayBuffer:async()=>Uint8Array.from(bytes).buffer};
+    }};
+  vm.runInNewContext(fs.readFileSync(require.resolve('../../mk/emscripten/coop-view.js'),'utf8'),browser);
+  return {view:browser.SupertuxView,stats,config:{manifestUrl:'manifest.json',manifestSha256:entry(manifest).sha256}};
+}
+
+test('partial artwork aborts sibling workers, publishes no scene and can retry with monotone validated-byte progress',async()=>{
+  const f=preparationFixture();f.stats.corrupt=true;
+  await assert.rejects(f.view.prepare(f.config),/assets changed/);
+  assert.equal(f.stats.active,0);assert.equal(f.view.state.loaded,0);assert.equal(f.view.playable,false);
+  f.stats.corrupt=false;const progress=[];
+  await f.view.prepare(f.config,{onProgress:(completed,total)=>progress.push([completed,total])});
+  assert.equal(f.view.state.loaded,8);assert.ok(f.stats.maximum<=4);assert.equal(f.stats.active,0);
+  assert.equal(progress[0][0],0);assert.equal(progress.at(-1)[0],progress.at(-1)[1]);
+  assert.ok(progress.every((p,i)=>!i || p[0]>=progress[i-1][0]));
+  const requests=f.stats.requests;
+  await f.view.prepare(f.config);assert.equal(f.stats.requests,requests,'Prepared same-build artwork is reused');
+});
+
+test('cancelling preparation retires all requests before a new attempt and never acknowledges partial artwork',async()=>{
+  const f=preparationFixture(),controller=new AbortController();f.stats.hold=true;
+  const pending=f.view.prepare(f.config,{signal:controller.signal});
+  while (!f.stats.active) await new Promise(resolve=>setImmediate(resolve));
+  controller.abort();await assert.rejects(pending,{name:'AbortError'});
+  assert.equal(f.stats.active,0);assert.equal(f.view.state.loaded,0);
+  f.stats.hold=false;await f.view.prepare(f.config);assert.equal(f.view.state.loaded,8);assert.ok(f.stats.maximum<=4);
 });

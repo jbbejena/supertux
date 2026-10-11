@@ -1,5 +1,22 @@
 # Private co-op: HTTPS staging and phone acceptance
 
+## Current staging and Host/Join
+
+Recovery PR #17 is merged into `mobile-web-audit`. Private staging refresh
+[38105080282](https://github.com/jbbejena/supertux/actions/runs/38105080282)
+publishes exact tested runtime `e7fe8aa180e5dcbe900cd14c833464256ba5f323` and passes
+delivery readiness plus all 24 shared-view checks in each of hosted Chromium
+and Linux WebKit. This supersedes the older publications recorded below.
+Normal **Mobile Web Deploy** still updates only the main game Worker.
+
+The [Phase 8C Host/Join handoff](PRIVATE_COOP_HOST_JOIN.md) describes the new
+**Host game → Share/Copy invitation → Player 2 ready → Start together** flow,
+its progress/retry, publication requirements and remaining device checks.
+Check `BUILD_INFO.json` and the publication summary before assuming staging
+serves that candidate. Physical-phone acceptance below remains unverified.
+
+## Historical recovery publications
+
 The [private HTTPS host](https://supertux-private-input-proof.jshbjnr.workers.dev/index.html?coop=1)
 is separate from production. The final recovery/save-correction runtime is
 `52d8bf370bee4b97b1a943beec695274fb13b518`, based on merged Phase 8B at

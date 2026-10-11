@@ -2,6 +2,11 @@
 
 Updated: 2026-10-09 UTC.
 
+Phase 8C's guided phone Host/Join flow is described in
+[PRIVATE_COOP_HOST_JOIN.md](PRIVATE_COOP_HOST_JOIN.md). The merged recovery
+baseline has passed refreshed hosted staging; physical-phone acceptance and
+Phase 8D replay/room-lifetime polish remain separate gates.
+
 Status: phases 5, 6A and the contained 6B remote-input proof are implemented.
 Phase 7A adds a controlled guest display of static terrain, both players and the
 host's shared camera. Phase 7B adds the original Welcome to Antarctica level,

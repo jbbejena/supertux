@@ -4,6 +4,16 @@ import {CoopRoom, coopFetch, PROTOCOL} from '../../worker/coop.js';
 import {validView} from '../../worker/view.js';
 
 const build = 'b'.repeat(64), token = 'a'.repeat(64);
+test('read-only room discovery needs no Origin and cannot create a room on an unbound server', async () => {
+  const request=new Request('https://example.com/coop/capabilities');
+  assert.equal((await coopFetch(request,{})).status,404);
+  const env={COOP_ROOMS:{get(){throw Error('Discovery must not access room storage');}}};
+  const response=await coopFetch(request,env);
+  assert.equal(response.status,200);assert.equal(response.headers.get('Cache-Control'),'no-store');
+  assert.equal(response.headers.get('Access-Control-Allow-Origin'),null);
+  assert.deepEqual(await response.json(),{rooms:true,protocol:PROTOCOL});
+  assert.equal((await coopFetch(new Request(request.url,{method:'POST'}),env)).status,403);
+});
 function fixture() {
   const room = {host: token, guest: 'c'.repeat(64), build, origin: 'http://localhost:8787', expires: Date.now() + 900000};
   const sockets = [];
