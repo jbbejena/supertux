@@ -324,8 +324,17 @@ async def run(args, url):
 
         # Normal GameManager/Levelset entry from the title screen, rather than
         # nesting another GameSession inside a live campaign level.
-        await host.locator('#coop_panel').evaluate('(e)=>e.open=true')
-        await host.locator('#coop_forest').click()
+        if args.local_only:
+            # This ordinary HTTP preview has no room relay. Keep the player
+            # panel hidden and select the existing native diagnostic command
+            # directly for the local-gamepad fixture. Remote coverage below
+            # still exercises the real diagnostic button on a room server.
+            assert await host.locator('#coop_panel').is_hidden()
+            assert not await host.evaluate('Module.supertuxCoop.state.supportsRooms')
+            await host.evaluate('Module.supertuxCoop.enqueue([5,1,0,0])')
+        else:
+            await host.locator('#coop_panel').evaluate('(e)=>e.open=true')
+            await host.locator('#coop_forest').click()
         await host.wait_for_timeout(2000)
         await host.locator('#coop_panel').evaluate('(e)=>e.open=false')
         await host.locator('#canvas').focus()

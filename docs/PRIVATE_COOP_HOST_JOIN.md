@@ -89,6 +89,9 @@ trusted neutral Resume and guest backgrounding. Evidence captures no invitation
 credentials. Headless Chromium uses software page compositing while retaining
 SDL/WebGL; Linux WebKit is not physical Safari. Existing full shared-view,
 remote-input, touch, audio, save and cache checks remain in CI.
+The local-gamepad suite uses ordinary HTTP and asserts that rooms stay hidden.
+Its Forest entry uses the existing native command API as a labelled diagnostic
+fixture; the real room-server suite retains the Forest button interaction.
 
 The existing WASM job runs the lobby suite in Chromium for both configurations
 and in WebKit for Release, retaining evidence. No jobs/workflow-level filters are
