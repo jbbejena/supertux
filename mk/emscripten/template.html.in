@@ -201,8 +201,9 @@
       border-radius: 8px; font: bold 1rem arial; cursor: pointer; touch-action: manipulation;
     }
     button:disabled { opacity: .6; cursor: wait; }
-    #coop_panel { position: absolute; top: env(safe-area-inset-top, 0px); right: env(safe-area-inset-right, 0px); z-index: 6;
-      max-width: calc(100% - 16px); max-height: 85dvh; overflow: auto; margin: 8px; padding: 8px 12px;
+    /* game_shell applies safe areas once; constrain this child to game_area. */
+    #coop_panel { position: absolute; top: 0; right: 0; z-index: 6;
+      max-width: calc(100% - 16px); max-height: calc(100% - 16px); overflow: auto; margin: 8px; padding: 8px 12px;
       background: #142333; color: white; border: 1px solid #a5c7ed; border-radius: 12px; font: 1rem system-ui; }
     #coop_panel[open] { width: 440px; }
     #coop_panel > summary { min-height: 44px; cursor: pointer; display: flex; align-items: center; }

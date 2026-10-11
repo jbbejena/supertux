@@ -123,13 +123,22 @@ async def run(args, url):
                 await host.evaluate("Module.supertuxShell.pause('Paused for viewport evidence. Press Resume.')")
                 await guest.wait_for_function('!SupertuxView.state.enabled')
                 await host.locator('#coop_panel').evaluate('(e)=>e.open=true')
+                if label == 'landscape':
+                    # Explicit inset emulation, not physical Safari. The shell
+                    # already owns these insets; its child must fit its bounds.
+                    await host.evaluate("document.querySelector('#game_shell').style.padding='44px 24px 34px 24px'")
+                    assert await host.evaluate('''() => {
+                      const p=document.querySelector('#coop_panel').getBoundingClientRect(),a=document.querySelector('#game_area').getBoundingClientRect();
+                      return p.top>=a.top && p.left>=a.left && p.right<=a.right+.5 && p.bottom<=a.bottom+.5;
+                    }''')
+                    await host.evaluate("document.querySelector('#game_shell').style.padding=''")
                 assert await host.evaluate("(()=>{const e=document.querySelector('#start_button'),r=e.getBoundingClientRect();return document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)===e;})()")
                 await host.screenshot(path=str(args.output/(label+'-host.png')))
                 await guest.screenshot(path=str(args.output/(label+'-guest.png')))
                 await host.locator('#start_button').tap()
                 await guest.wait_for_function('SupertuxView.playable && supertuxGuest.state.mask===0')
                 await host.locator('#coop_panel').evaluate('(e)=>e.open=false')
-            report['checks'].append('Portrait/landscape touch targets stay onscreen at least 44px; an expanded co-op panel cannot cover trusted Resume; both resumes require fresh neutral state')
+            report['checks'].append('Portrait/landscape touch targets stay onscreen at least 44px; the panel fits an explicit inset fixture and cannot cover trusted Resume; both resumes require fresh neutral state')
 
             await guest.evaluate("Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'))")
             await host.wait_for_function('Module.supertuxCoop.state.lost && !Module.supertuxShell.active')
