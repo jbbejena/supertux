@@ -4,6 +4,8 @@ This runtime is merged through PR #14 at
 `c385d97aba1476a984e497a33c1bd24183c55293`. Its original validation below is
 retained with exact source identities. Follow-on baseline measurements and the
 phone usability plan are in [PRIVATE_COOP_PHASE8.md](PRIVATE_COOP_PHASE8.md).
+The current guided Host/Join controls are covered in
+[PRIVATE_COOP_HOST_JOIN.md](PRIVATE_COOP_HOST_JOIN.md).
 
 Implementation baseline: `mobile-web-audit` at
 `314e62e20b3f5703bb00683ad59f5ff47beb5661` (merged PR #13).
@@ -21,10 +23,12 @@ published HTTPS co-op staging build. The ordinary production Worker has no
 private-room binding; this PR does not enable multiplayer production delivery.
 
 1. Host opens `index.html?coop=1`, taps Start, then expands Private co-op.
-2. Host creates a room and shares **Guest shared view**. Guest artwork is
+2. Host chooses **Host game** and shares the Player 2 invitation (**Guest shared
+   view** on the original Phase 7B runtime). Guest artwork is
    verified and loaded before the guest joins. The controller-only invitation
    does not provide a second game screen.
-3. After Player 2 joins, host chooses **Play Welcome to Antarctica**.
+3. After Player 2 joins, host chooses **Start together** (**Play Welcome to
+   Antarctica** on the original Phase 7B runtime).
 4. Both screens use the native shared camera. Host owns Player 1, menus,
    pausing, world-map progression and saves; guest owns Player 2 input.
 5. Action respawns a downed Player 2 under the existing local co-op rules.

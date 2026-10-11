@@ -5,7 +5,10 @@ This work follows merged Phase 8B (PR #16) on `mobile-web-audit` at
 failures measured in [PRIVATE_COOP_SMOOTHING.md](PRIVATE_COOP_SMOOTHING.md).
 It does not claim to finish the phone Host/Join flow or physical-device acceptance.
 
-The implementation is under review in [PR #17](https://github.com/jbbejena/supertux/pull/17).
+The implementation merged in [PR #17](https://github.com/jbbejena/supertux/pull/17).
+The failed publications below are historical evidence. The merged recovery
+baseline's successful staging refresh and current phone entry are covered in
+[PRIVATE_COOP_HOST_JOIN.md](PRIVATE_COOP_HOST_JOIN.md).
 Runtime `7c7926478e40f24cf6bca972609f1a86ee5d1de4` passes all six
 [focused PR checks](https://github.com/jbbejena/supertux/actions/runs/38016818646),
 including Release/Debug WASM and representative Linux. The
