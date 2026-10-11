@@ -5,8 +5,9 @@ import {validView} from '../../worker/view.js';
 
 const build = 'b'.repeat(64), token = 'a'.repeat(64);
 test('read-only room discovery needs no Origin and cannot create a room on an unbound server', async () => {
-  const request=new Request('https://example.com/coop/capabilities');
-  assert.equal((await coopFetch(request,{})).status,404);
+  const request=new Request('https://example.com/coop/capabilities.json');
+  const unavailable=await coopFetch(request,{});
+  assert.equal(unavailable.status,200);assert.deepEqual(await unavailable.json(),{rooms:false,protocol:PROTOCOL});
   const env={COOP_ROOMS:{get(){throw Error('Discovery must not access room storage');}}};
   const response=await coopFetch(request,env);
   assert.equal(response.status,200);assert.equal(response.headers.get('Cache-Control'),'no-store');

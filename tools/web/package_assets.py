@@ -204,6 +204,11 @@ def assemble(build, output, cloudflare=False, compression=True):
             page = re.sub(r'<script src="' + re.escape(script) + r'"[^>]*>', '<script src="' + script + '" integrity="sha256-' + base64.b64encode(bytes.fromhex(manifest['frontend'][script]['sha256'])).decode() + '">', page)
         write(output / name, page.encode())
         manifest['frontend'][name] = dict(bytes=(output / name).stat().st_size, sha256=digest(output / name))
+    # An ordinary HTTP server has no room relay. Private Workers override this
+    # exact route; discovery must not manufacture missing-resource errors.
+    capability_path = output / 'coop/capabilities.json'
+    write(capability_path, encoded(dict(rooms=False, protocol=2)))
+    manifest['frontend']['coop/capabilities.json'] = dict(bytes=capability_path.stat().st_size, sha256=digest(capability_path))
     # The manifest binds code, configuration, inventory, and every payload.
     manifest_bytes = encoded(manifest)
     write(output / 'asset-manifest.json', manifest_bytes)

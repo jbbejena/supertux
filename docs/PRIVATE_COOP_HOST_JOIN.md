@@ -37,10 +37,15 @@ private co-op site. It rejects foreign origins, credentialed URLs, controller-on
 links and malformed fragments. Opening the shared invitation directly avoids
 loading the host game on the guest device.
 
-`GET /coop/capabilities` discovers room support. Neither `?coop=1` nor a stale
+`GET /coop/capabilities.json` discovers room support. Neither `?coop=1` nor a stale
 link advertises rooms without the Durable Object binding. Discovery returns no
 room state/credentials; room mutations/socket authentication retain Origin checks.
 The ordinary production Worker remains single-player unless separately configured.
+Complete previews include a hash-verified static `rooms:false` JSON fallback, so
+ordinary HTTP servers return a successful discovery response. The private Worker
+overrides this one route with live room availability and `no-store`. Hosted
+readiness checks its exact bounded JSON/MIME/cache policy separately from static
+presentation hashes; all existing build/manifest/payload checks remain intact.
 Controller-only invitations and static/forest test buttons require
 `?coop_debug=1`. Existing diagnostic suites use that explicit flag; the new lobby
 suite uses ordinary `index.html` without developer arguments.
@@ -88,7 +93,7 @@ remote-input, touch, audio, save and cache checks remain in CI.
 The existing WASM job runs the lobby suite in Chromium for both configurations
 and in WebKit for Release, retaining evidence. No jobs/workflow-level filters are
 added. Required validation still fails on needed-job failure. The shared action
-change receives Release WASM, lint/focused tests and representative Linux; manually
+change receives Release/Debug WASM, lint/focused tests and representative Linux; manually
 run `WebAssembly` for exact non-PR Release/Debug acceptance before private
 publication. Full-platform manual/weekly/tag access is retained.
 
@@ -105,7 +110,7 @@ Local development validation on the merged baseline plus this working-tree chang
 | Release WASM build | Pass; complete artifact verified by the local Worker preview |
 | Normal-entry lobby, Chromium 151 | All six checks pass; no script errors |
 | Normal-entry lobby, Linux WebKit 26.5 | All six checks pass; no script errors |
-| Focused JavaScript / Python | 95 / 22 pass |
+| Focused JavaScript / Python | 95 / 23 pass |
 | Workflow syntax and diff whitespace | Pass |
 
 These local build identities refer to the baseline plus working-tree edits; final

@@ -188,7 +188,7 @@
     if (element('coop_share')) element('coop_share').hidden = !window.navigator?.share;
     render();
     // A query flag cannot enable rooms on the production Worker.
-    fetch('/coop/capabilities', {cache:'no-store', signal:AbortSignal.timeout(5000)}).then(async response => {
+    fetch('/coop/capabilities.json', {cache:'no-store', signal:AbortSignal.timeout(5000)}).then(async response => {
       if (!response.ok) return;
       const value = await response.json();
       supportsRooms = value.rooms === true && value.protocol === protocol;

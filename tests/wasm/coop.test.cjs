@@ -23,7 +23,7 @@ function fixture(guest = false, fetch = async () => {throw Error('Unexpected fet
     close() {this.readyState = 3;}
   }
   const document = target({hidden: false, getElementById: id => elements.get(id), querySelectorAll: () => []});
-  const request = async (url, options) => url === '/coop/capabilities' ? {ok:rooms,json:async()=>({rooms,protocol:2})} : fetch(url, options);
+  const request = async (url, options) => url === '/coop/capabilities.json' ? {ok:rooms,json:async()=>({rooms,protocol:2})} : fetch(url, options);
   const window = target({document, TextEncoder, URL, URLSearchParams, WebSocket: Socket, AbortSignal, AbortController, fetch:request, performance, Date: clock,
     location: {href: 'http://localhost/index.html', protocol: 'http:', search: '?coop=1',
       hash: '#'+new URLSearchParams({room:'a'.repeat(32),token:'b'.repeat(64),build:'c'.repeat(64)}).toString()},
