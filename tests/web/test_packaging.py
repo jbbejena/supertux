@@ -40,6 +40,14 @@ class PackagingTests(unittest.TestCase):
             preview=Path(directory)/'preview'
             manifest=packaging.assemble(build,preview)
             verify(preview,sha)
+            capability=preview/'coop/capabilities.json'
+            fallback=capability.read_bytes()
+            self.assertEqual(json.loads(fallback),{'rooms':False,'protocol':2})
+            capability.unlink()
+            with self.assertRaises(AssertionError): verify(preview,sha)
+            capability.parent.mkdir(parents=True,exist_ok=True)
+            capability.write_bytes(fallback)
+            verify(preview,sha)
             for category,suffix in [('startup','data'),('wasm','wasm'),('javascript','js')]:
                 variant=manifest['packages'][category]['encodings']['gzip']
                 self.assertEqual(gzip.decompress((preview/variant['url']).read_bytes()),(build/('supertux2.'+suffix)).read_bytes())

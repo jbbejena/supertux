@@ -231,12 +231,12 @@ async def measure_trial(args,url,index,html,hc,gc,version):
         # Developer console fixtures need the existing --developer launch flag.
         # Routing disables the host's HTTP cache; warm host reuse tests its
         # persistent asset database instead. Guest requests remain un-routed.
-        await host.route('**/index.html?coop=1',lambda route:route.fulfill(body=html,content_type='text/html'))
+        await host.route('**/index.html?coop=1&coop_debug=1',lambda route:route.fulfill(body=html,content_type='text/html'))
         async def boot_host(warm):
             before=await network_counts(args)
             start=time.monotonic()
             if warm: await host.reload()
-            else: await host.goto(url+'index.html?coop=1')
+            else: await host.goto(url+'index.html?coop=1&coop_debug=1')
             await host.wait_for_function('Module.supertuxReady',timeout=180000)
             kind='warm' if warm else 'cold'
             result['loading']['host_'+kind+'_ready_ms']=round((time.monotonic()-start)*1000,2)

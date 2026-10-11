@@ -3,6 +3,17 @@
   'use strict';
   const protocol = 2, limit = 32, buttons = {ArrowLeft: 1, KeyA: 1, ArrowRight: 2, KeyD: 2,
     ArrowUp: 4, KeyW: 4, ArrowDown: 8, KeyS: 8, Space: 16, KeyJ: 16, ControlLeft: 32, KeyK: 32, ShiftLeft: 64};
+  const validInvitation = params => /^[a-f0-9]{32}$/.test(params.get('room') || '') &&
+    ['token','build'].every(key => /^[a-f0-9]{64}$/.test(params.get(key) || '')) &&
+    [...params.keys()].length === 3;
+  function invitationURL(text) {
+    if (typeof text !== 'string' || text.length > 2048) throw Error('Paste the private invitation shared by the host.');
+    const url = new URL(text.trim()), expected = new URL('coop-view.html', location.href);
+    if (url.origin !== expected.origin || url.pathname !== expected.pathname || url.search || url.username || url.password ||
+        !validInvitation(new URLSearchParams(url.hash.slice(1))))
+      throw Error('Use a Player 2 invitation from this private co-op site.');
+    return url.href;
+  }
 
   class Connection {
     constructor(room, role, token, build, events) {
@@ -46,12 +57,35 @@
 
   function host(module) {
     const queue = [], status = document.getElementById('coop_status');
+    const element = id => document.getElementById(id), diagnostics = new URLSearchParams(location.search).has('coop_debug');
+    let supportsRooms = false, invitation = '', started = false, starting = false;
     let relayInterrupted = false, lost = false, recoveryPaused = false, retiredGeneration = null, pauseGeneration = null, lastStall = 0, lastFrame = performance.now();
     let sceneDeadline = 0, sceneKey = null, sceneLoaded = null, connection, creating = false, createEpoch = 0, joinRejected = false, guestView = false, lastView = 0, state = {reserved: 0, enabled: false, generation: 0, sequence: 0}, lastSent = '';
-    const say = text => { if (status) status.textContent = text; };
+    const say = text => { if (status && status.textContent !== text) status.textContent = text; };
+    const guestReady = () => !!(connection?.ready && guestView && state.reserved === 1 && !lost && !relayInterrupted && !joinRejected);
+    const startReady = () => diagnostics ? !!(connection?.ready && state.reserved === 1 && !lost && !relayInterrupted && !joinRejected) : guestReady();
+    const set = (id, key, value) => {const node = element(id); if (node && node[key] !== value) node[key] = value;};
+    const render = () => {
+      set('coop_create','disabled',!supportsRooms || !module.supertuxReady || creating || lost || started || state.reserved === 1 || !!(connection && !connection.closed));
+      set('coop_antarctica','disabled',!startReady() || starting || (!diagnostics && started) || !module.supertuxShell?.active);
+      set('coop_antarctica','hidden',started && !diagnostics);
+      set('coop_close','hidden',!connection || connection.closed);
+      set('coop_invite','hidden',!invitation || started || guestReady());
+      for (const id of ['coop_share','coop_copy']) set(id,'disabled',!invitation || !connection?.ready);
+      set('coop_join_form','hidden',!!invitation || creating || started || lost);
+    };
+    const clearInvitation = () => {
+      invitation = '';
+      if (element('coop_invitation')) element('coop_invitation').value = '';
+      if (element('coop_manual')) element('coop_manual').hidden = true;
+      if (element('coop_share_status')) element('coop_share_status').textContent = '';
+      for (const id of ['coop_view_link','coop_link']) if (element(id)) element(id).href = '';
+      render();
+    };
     const interrupt = (reason, permanent = false) => {
       if (state.reserved !== 1) return;
       lost ||= permanent;
+      if (permanent) clearInvitation();
       recoveryPaused = true;
       pauseGeneration = state.generation;
       queue.length = 0;
@@ -110,6 +144,7 @@
       },
       engineStatus(reserved, enabled, generation, sequence) {
         state = {reserved, enabled: !!enabled, generation, sequence};
+        if (enabled) {started = true; starting = false;}
         if (generation !== pauseGeneration) pauseGeneration = null;
         if (generation !== retiredGeneration) retiredGeneration = null;
         if (enabled && module.supertuxShell?.active) recoveryPaused = false;
@@ -117,11 +152,12 @@
         if (key !== lastSent) { lastSent = key; session(); }
         if (reserved === 1) joinRejected = false;
         if (reserved === -2) joinRejected = true;
-        if (connection?.ready && reserved === 1 && !relayInterrupted && !lost && !recoveryPaused) say(enabled ? 'Player 2 input active. Host owns the game and saves.' : 'Player 2 joined. Input waits while the host is in menus or paused.');
+        if (connection?.ready && reserved === 1 && !relayInterrupted && !lost && !recoveryPaused) say(enabled ? 'Playing together. You control Player 1; your guest controls Player 2.' : starting ? 'Starting together. Waiting for Player 2’s scene…' : started ? 'Paused. Release controls before continuing.' : guestView ? 'Player 2 ready. Press Start together.' : 'Controller connected. Use the shared-view invitation to play on two screens.');
         if (connection?.ready && reserved === -1 && !joinRejected) say('Player 2 disconnected. Return to the title screen, rejoin, then start a level.');
         if (connection?.ready && joinRejected) say('Join requires one local player at the title screen. Return there and rejoin before starting a level; reload if local Player 2 was already configured.');
+        render();
       },
-      get state() { return {...state, queued: queue.length, joinRejected, relayInterrupted, lost, recoveryPaused, awaitingNativeReset:pauseGeneration !== null, lastStall}; },
+      get state() { return {...state, queued: queue.length, joinRejected, relayInterrupted, lost, recoveryPaused, awaitingNativeReset:pauseGeneration !== null, lastStall, guestReady:guestReady(), supportsRooms, starting, started}; },
       get connection() { return connection; },
       wantsView() {return !!(connection?.ready && guestView && state.reserved === 1 && state.generation && Date.now() - lastView >= 100);},
       sceneReady(session, epoch) {
@@ -147,27 +183,42 @@
       finished(session, epoch, win) {if (connection?.ready && guestView) connection.send({type:'result',session,epoch,generation:state.generation,win:!!win});},
     };
     const panel = document.getElementById('coop_panel');
-    if (panel) panel.hidden = !new URLSearchParams(location.search).has('coop');
+    if (panel) panel.hidden = true;
+    if (element('coop_diagnostics')) element('coop_diagnostics').hidden = !diagnostics;
+    if (element('coop_share')) element('coop_share').hidden = !window.navigator?.share;
+    render();
+    // A query flag cannot enable rooms on the production Worker.
+    fetch('/coop/capabilities.json', {cache:'no-store', signal:AbortSignal.timeout(5000)}).then(async response => {
+      if (!response.ok) return;
+      const value = await response.json();
+      supportsRooms = value.rooms === true && value.protocol === protocol;
+      if (panel) panel.hidden = !supportsRooms;
+      render();
+    }).catch(() => {}); // Single-player remains usable when discovery fails.
     document.getElementById('coop_create')?.addEventListener('click', async () => {
       if (creating || !module.supertuxReady) return;
       if (lost || state.reserved === 1) {say('Close the current room and return to the title screen before creating a new invitation.');return;}
       const epoch = ++createEpoch;
       creating = true; sceneDeadline=0;sceneKey = sceneLoaded = null; joinRejected = false; connection?.close(); relayInterrupted = lost = recoveryPaused = false; retiredGeneration = pauseGeneration = null; enqueue([3, 0, 0, 0]);
+      clearInvitation(); say('Creating your private room…'); render();
       const restart = document.getElementById('coop_restart');
       if (restart) restart.hidden = true;
       try {
         const build = window.SUPERTUX_DEPLOY_CONFIG?.manifestSha256;
         const response = await fetch('/coop/rooms', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({protocol, build}), signal: AbortSignal.timeout(10000)});
-        if (!response.ok) throw Error('Private input rooms are unavailable here. Start the local proof server.');
+        if (!response.ok) throw Error('Could not create the room. Check your connection and tap Host game to retry.');
         const room = await response.json();
         if (epoch !== createEpoch || document.hidden) return;
+        if (!validInvitation(new URLSearchParams({room:room.room,token:room.guest,build:room.build})) || room.build !== build || !/^[a-f0-9]{64}$/.test(room.host || '')) throw Error('Room creation failed. Tap Host game to retry.');
         const join = new URL('coop-controller.html', location.href);
         join.hash = new URLSearchParams({room: room.room, token: room.guest, build: room.build});
-        const link = document.getElementById('coop_link'); link.href = join.href; link.textContent = join.href;
+        const link = document.getElementById('coop_link'); if (link) {link.href = join.href; link.textContent = 'Open controller-only diagnostic';}
         const viewLink = document.getElementById('coop_view_link');
-        if (viewLink) {join.pathname = new URL('coop-view.html', location.href).pathname; viewLink.href = join.href; viewLink.textContent = join.href;}
+        join.pathname = new URL('coop-view.html', location.href).pathname; invitation = join.href;
+        if (viewLink) {viewLink.href = invitation; viewLink.textContent = 'Open Player 2 invitation';}
+        if (element('coop_invitation')) element('coop_invitation').value = invitation;
         connection = new Connection(room.room, 'host', room.host, build, {
-          ready: () => { say('Room ready. Invite Player 2 before starting a level.'); session(); },
+          ready: () => { say('Room ready. Share the invitation with Player 2.'); session(); render(); },
           message: value => {
             if (value.type === 'connection' && value.interrupted === true) {relayInterrupted = true; interrupt('Connection interrupted. Controls are released. Wait for recovery, then press Resume.');}
             if (value.type === 'connection' && value.interrupted === false) {relayInterrupted = false; say('Connection recovered. Release controls, then press Resume on the host.');}
@@ -186,12 +237,40 @@
             }
           },
           refresh: session,
-          closed: reason => { interrupt('Connection lost. Return to the title screen and create a new room.', true); guestView = false; enqueue([3, 0, 0, 0]); say(reason); },
+          closed: reason => { interrupt('Connection lost. Return to the title screen and create a new room.', true); guestView = false; starting = false; clearInvitation(); enqueue([3, 0, 0, 0]); say(reason); },
         });
       } catch (error) { if (epoch === createEpoch) say(error.message); }
-      finally { creating = false; }
+      finally {
+        creating = false;
+        if (epoch !== createEpoch && !connection?.ready) say('Room creation was interrupted. Press Resume, then tap Host game to retry.');
+        render();
+      }
     });
-    document.getElementById('coop_close')?.addEventListener('click', () => {++createEpoch; connection?.close();});
+    document.getElementById('coop_close')?.addEventListener('click', () => {++createEpoch; connection?.close(); clearInvitation();});
+    const manualCopy = () => {
+      if (element('coop_manual')) element('coop_manual').hidden = false;
+      element('coop_invitation')?.focus(); element('coop_invitation')?.select();
+      if (element('coop_share_status')) element('coop_share_status').textContent = 'Copy the selected invitation and send it to Player 2.';
+    };
+    element('coop_copy')?.addEventListener('click', async () => {
+      const current = invitation;
+      if (!current || !connection?.ready) return;
+      try {
+        if (!window.navigator?.clipboard?.writeText) throw Error('Clipboard unavailable');
+        await window.navigator.clipboard.writeText(current);
+        if (invitation === current && element('coop_share_status')) element('coop_share_status').textContent = 'Invitation copied. Send it privately to Player 2.';
+      } catch {if (invitation === current) manualCopy();}
+    });
+    element('coop_share')?.addEventListener('click', async () => {
+      const current = invitation;
+      if (!current || !connection?.ready || !window.navigator?.share) return;
+      try {await window.navigator.share({title:'SuperTux private co-op',text:'Join me as Player 2 in Welcome to Antarctica.',url:current});}
+      catch (error) {if (error.name !== 'AbortError' && invitation === current) manualCopy();}
+    });
+    element('coop_join_invitation')?.addEventListener('click', () => {
+      try {location.assign(invitationURL(element('coop_join_url')?.value));}
+      catch {if (element('coop_join_status')) element('coop_join_status').textContent = 'Paste a Player 2 invitation from this private co-op site.';}
+    });
     document.getElementById('coop_restart')?.addEventListener('click', async () => {
       const restart = document.getElementById('coop_restart');
       if (!lost || restart?.disabled) return;
@@ -209,8 +288,10 @@
       }
     });
     document.getElementById('coop_antarctica')?.addEventListener('click', () => {
-      if (guestView && state.reserved !== 1) say('Invite Player 2 before starting.');
-      else enqueue([5, 0, 0, 0]);
+      if (!startReady() || starting || (!diagnostics && started) || !module.supertuxShell?.active) {say('Wait for Player 2 to be ready, then press Start together.');return;}
+      starting = true; say('Starting together. Waiting for Player 2’s scene…'); render();
+      enqueue([5, 0, 0, 0]);
+      if (panel) panel.open = false;
     });
     document.getElementById('coop_forest')?.addEventListener('click', () => enqueue([5, 1, 0, 0]));
     document.getElementById('coop_view_start')?.addEventListener('click', () => {
@@ -227,6 +308,8 @@
     const params = new URLSearchParams(location.hash.slice(1)), keys = new Map(), fingers = new Map();
     const status = document.getElementById('guest_status');
     const view = window.SupertuxView;
+    const retry = document.getElementById('guest_join'), progress = document.getElementById('guest_progress');
+    let joinController;
     let connection, generation = 0, sequence = 0, enabled = false, joining = false, joinEpoch = 0, relayInterrupted = false;
     const mask = () => [...keys.values(), ...fingers.values()].reduce((a, b) => a | b, 0);
     const send = () => {
@@ -237,29 +320,51 @@
     const join = async () => {
       if (joining) return;
       const epoch = ++joinEpoch;
+      joinController?.abort(); joinController = new AbortController();
+      const signal = joinController.signal;
       connection?.close(); enabled = relayInterrupted = false; clear(); generation = sequence = 0;
       view?.reset();
       joining = true;
+      if (retry) retry.disabled = true;
+      if (progress) {progress.hidden = false; progress.removeAttribute('value');}
       if (connection && connection.socket.readyState !== WebSocket.CLOSED) {
         await new Promise(resolve => {
           const timer = setTimeout(resolve, 1000);
           connection.socket.addEventListener('close', () => {clearTimeout(timer); resolve();}, {once:true});
         });
       }
-      if (!/^[a-f0-9]{32}$/.test(params.get('room') || '') || !/^[a-f0-9]{64}$/.test(params.get('token') || '') || !/^[a-f0-9]{64}$/.test(params.get('build') || '')) {
-        joining = false; status.textContent = 'Use the private controller link shared by the host.'; return;
+      if (!validInvitation(params)) {
+        joining = false; status.textContent = 'Open the private invitation shared by the host.';
+        if (retry) retry.disabled = false;
+        if (progress) progress.hidden = true;
+        return;
       }
-      status.textContent = 'Joining diagnostic controller…';
+      status.textContent = 'Checking your invitation…';
       try {
-        const html = await (await fetch('index.html', {cache: 'no-store', signal: AbortSignal.timeout(10000)})).text();
+        const response = await fetch('index.html', {cache: 'no-store', signal: AbortSignal.any([signal,AbortSignal.timeout(10000)])});
+        if (!response.ok) throw Error('Could not check the invitation. Check your connection and tap Retry joining.');
+        const html = await response.text();
+        if (epoch !== joinEpoch || document.hidden) return;
         const config = /window\.SUPERTUX_DEPLOY_CONFIG = (.*?);<\/script>/.exec(html);
-        if (!config || JSON.parse(config[1]).manifestSha256 !== params.get('build')) throw Error('The host and controller builds differ. Ask the host for a new room link.');
-        if (view) await view.prepare(JSON.parse(config[1]));
-      } catch (error) { joining = false; status.textContent = error.message; return; }
+        if (!config || JSON.parse(config[1]).manifestSha256 !== params.get('build')) throw Error('The game was updated. Ask the host for a new invitation.');
+        if (view) await view.prepare(JSON.parse(config[1]), {signal, onProgress(completed,total) {
+          if (epoch !== joinEpoch || signal.aborted) return;
+          if (progress) {progress.max = total || 1; progress.value = completed;}
+          status.textContent = `Preparing Player 2 artwork · ${total ? Math.floor(completed/total*100) : 100}%`;
+        }});
+      } catch (error) {
+        if (epoch === joinEpoch) {status.textContent = error.name === 'TimeoutError' ? 'Joining took too long. Check your connection and tap Retry joining.' : error.message;}
+        return;
+      } finally {
+        if (epoch === joinEpoch) {joining = false; if (retry) retry.disabled = false; if (progress) progress.hidden = true;}
+      }
       if (epoch !== joinEpoch || document.hidden) {joining = false; return;}
+      joining = true;
+      if (retry) retry.disabled = true;
+      status.textContent = 'Artwork ready. Connecting to the host…';
       connection = new Connection(params.get('room'), 'guest', params.get('token'), params.get('build'), {
         view: !!view,
-        ready: () => { joining = false; status.textContent = 'Joined. Wait for the host to start a level.'; },
+        ready: () => { joining = false; if (retry) {retry.disabled = false; retry.hidden = true;} status.textContent = 'Player 2 ready. Waiting for the host to press Start together.'; },
         message: value => {
           if (value.type === 'connection' && value.interrupted === true) {relayInterrupted = true; enabled = false; clear(); view?.setEnabled(false,generation); status.textContent = 'Connection interrupted. Controls are released. Wait for the host to resume.';}
           if (value.type === 'connection' && value.interrupted === false) {relayInterrupted = false; status.textContent = 'Connection recovered. Waiting for the host to press Resume.';}
@@ -269,14 +374,14 @@
               enabled = value.enabled && !relayInterrupted; send(); // fresh neutral state, never held-key replay
             }
             view?.setEnabled(enabled,generation);
-            status.textContent = enabled ? (view ? 'Player 2 input active. You control Player 2 in the shared view.' : 'Player 2 input active. The game is visible on the host only.') : 'Host is paused or in menus. Release controls before continuing.';
+            status.textContent = enabled ? (view ? 'You control Player 2. The host controls Player 1.' : 'Player 2 input active. The game is visible on the host only.') : relayInterrupted ? 'Connection interrupted. Waiting for the host to resume.' : view && !view.state.latest ? 'Player 2 ready. Waiting for the host to press Start together.' : 'Host is paused or in menus. Release controls before continuing.';
           }
           if (value.type === 'view' && view) view.accept(value);
           if (value.type === 'result' && view) view.result(value);
           if (value.type === 'ack') document.getElementById('guest_ack').textContent = `Host accepted input ${value.sequence}.`;
         },
         refresh: send,
-        closed: reason => { joining = false; enabled = false; clear(); view?.reset(); status.textContent = reason; },
+        closed: reason => { joining = false; if (retry) {retry.disabled = false; retry.hidden = false;} enabled = false; clear(); view?.reset(); status.textContent = reason + ' Ask the host for a fresh invitation if Retry joining does not work.'; },
       });
     };
     window.addEventListener('keydown', event => {
@@ -295,17 +400,22 @@
     window.addEventListener('hashchange', () => {
       // Invitations keep credentials in the fragment. Opening a new room in
       // this tab is a same-document navigation unless we retire this client.
-      ++joinEpoch; clear(); connection?.close('Joining the new invitation.');
+      ++joinEpoch; joinController?.abort(); clear(); connection?.close('Joining the new invitation.');
       location.reload();
     });
-    window.addEventListener('pagehide', () => { ++joinEpoch; clear(); connection?.close('Controller left. Rejoin from the host title screen.'); });
-    document.addEventListener('visibilitychange', () => { if (document.hidden) { ++joinEpoch; clear(); connection?.close('Controller backgrounded. Rejoin from the host title screen.'); } });
+    const leave = reason => {
+      ++joinEpoch; joinController?.abort(); joining = false; if (retry) {retry.disabled = false; retry.hidden = false;}
+      if (progress) progress.hidden = true;
+      clear(); enabled = false; view?.reset(); connection?.close(reason); status.textContent = reason;
+    };
+    window.addEventListener('pagehide', () => leave('Player 2 left. Ask the host for a fresh invitation.'));
+    document.addEventListener('visibilitychange', () => { if (document.hidden) leave('Player 2 was backgrounded. Ask the host for a fresh invitation.'); });
     document.getElementById('guest_join').addEventListener('click', join);
     // Diagnostic state is input/connection only. It contains no world data.
     window.supertuxGuest = {get state() {return {enabled, generation, sequence, mask: mask(), connected: !!connection?.ready};}, get connection() {return connection;}};
     join();
   }
-  window.SupertuxCoop = {Connection, host, guest};
+  window.SupertuxCoop = {Connection, host, guest, invitationURL};
   if (window.Module) host(window.Module);
   else if (document.getElementById('guest_status')) guest();
 })();

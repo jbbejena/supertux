@@ -39,7 +39,8 @@ class DeploymentTests(unittest.TestCase):
         root = Path(directory); frontend = root / 'frontend'; frontend.mkdir()
         manifest = {'sourceCommit': 'a' * 40, 'frontend': {}, 'packages': {}}
         contents = {'assets.js': b'bootstrap', 'supertux2.js': b'javascript',
-                    'coop-view.js': b'view', 'coop-art/' + 'b' * 64 + '.png': b'png'}
+                    'coop-view.js': b'view', 'coop/capabilities.json': b'{"rooms":false,"protocol":2}',
+                    'coop-art/' + 'b' * 64 + '.png': b'png'}
         for name, data in contents.items():
             entry = {'bytes': len(data), 'sha256': hashlib.sha256(data).hexdigest()}
             if name == 'assets.js': manifest['bootstrapSha256'] = entry['sha256']
@@ -56,10 +57,10 @@ class DeploymentTests(unittest.TestCase):
         requests = []
         class Handler(http.server.BaseHTTPRequestHandler):
             def log_message(self, *args): pass
-            def respond(self, data, mime, size=None):
+            def respond(self, data, mime, size=None, cache='public,max-age=31536000,immutable'):
                 self.send_response(200)
                 self.send_header('Content-Type', mime)
-                self.send_header('Cache-Control', 'public,max-age=31536000,immutable')
+                self.send_header('Cache-Control', cache)
                 self.send_header('Content-Length', str(len(data) if size is None else size))
                 self.end_headers()
                 if self.command != 'HEAD': self.wfile.write(data)
@@ -72,6 +73,11 @@ class DeploymentTests(unittest.TestCase):
                     self.respond(json.dumps(remote).encode(), 'application/json')
                 elif self.path == config['manifestUrl']: self.respond(encoded, 'application/json')
                 elif self.path == '/': self.respond(page.encode(), 'text/html')
+                elif self.path == '/coop/capabilities.json':
+                    value={'rooms':tamper != 'capabilities','protocol':2}
+                    if tamper == 'capabilities-extra': value['unexpected']=True
+                    self.respond(json.dumps(value).encode(), 'text/html' if tamper == 'capabilities-mime' else 'application/json',
+                                 cache='public' if tamper == 'capabilities-cache' else 'no-store')
                 elif self.path[1:] in contents:
                     name = self.path[1:]; body = contents[name]
                     if tamper == 'frontend' and name == 'coop-view.js': body = b'bad!'
@@ -129,3 +135,9 @@ class DeploymentTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             args = self.fixture(directory, 'rooms')
             with self.assertRaises(urllib.error.HTTPError): verify_once(*args[:-1])
+
+    def test_private_discovery_must_report_exact_protocol_and_no_store_json(self):
+        for tamper in ['capabilities','capabilities-extra','capabilities-mime','capabilities-cache']:
+            with self.subTest(tamper=tamper), tempfile.TemporaryDirectory() as directory:
+                args=self.fixture(directory,tamper)
+                with self.assertRaises(ValueError): verify_once(*args[:-1])

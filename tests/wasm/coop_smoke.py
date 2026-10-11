@@ -55,8 +55,8 @@ async def run(args, url):
                     values=group.split(','); players.append(dict(x=float(values[0]),y=float(values[1]),**{key: values[i+2]=='true' for i,key in enumerate(['left','right','jump','action'])}))
                 samples.append(players)
         host.on('console',console);host.on('pageerror',lambda e:errors.append(str(e)))
-        await host.route('**/index.html?coop=1',lambda r:r.fulfill(body=html,content_type='text/html'))
-        await host.goto(url+'index.html?coop=1')
+        await host.route('**/index.html?coop=1&coop_debug=1',lambda r:r.fulfill(body=html,content_type='text/html'))
+        await host.goto(url+'index.html?coop=1&coop_debug=1')
         await host.wait_for_function('Module.supertuxReady===true',timeout=180000)
         await host.locator('#start_button').click();await host.wait_for_function('Module.supertuxShell.active')
         async def status_after(text, start=0):
@@ -78,7 +78,7 @@ async def run(args, url):
         await status_after('In main menu');await host.wait_for_timeout(500)
         guest = None
         if not args.local_only:
-            await host.locator('#coop_panel summary').click();await host.locator('#coop_create').click()
+            await host.locator('#coop_panel > summary').click();await host.locator('#coop_create').click()
             await host.wait_for_function("document.querySelector('#coop_status').textContent.includes('Room ready')")
             link=await host.locator('#coop_link').get_attribute('href')
             gc=await guest_browser.new_context(viewport={'width':844,'height':390},has_touch=True)
@@ -106,7 +106,7 @@ async def run(args, url):
             await guest.wait_for_timeout(200)
             assert await guest.evaluate('supertuxGuest.state.connected')
             report['checks'].append('Actual relay fills its 32-message receive window; latest diagnostic status drains after delayed credits without disconnecting or queuing history')
-            await host.locator('#coop_panel summary').click()
+            await host.locator('#coop_panel > summary').click()
         async def guest_active():
             try:await guest.wait_for_function('supertuxGuest.state.enabled',timeout=15000)
             except Exception:
@@ -324,8 +324,17 @@ async def run(args, url):
 
         # Normal GameManager/Levelset entry from the title screen, rather than
         # nesting another GameSession inside a live campaign level.
-        await host.locator('#coop_panel').evaluate('(e)=>e.open=true')
-        await host.locator('#coop_forest').click()
+        if args.local_only:
+            # This ordinary HTTP preview has no room relay. Keep the player
+            # panel hidden and select the existing native diagnostic command
+            # directly for the local-gamepad fixture. Remote coverage below
+            # still exercises the real diagnostic button on a room server.
+            assert await host.locator('#coop_panel').is_hidden()
+            assert not await host.evaluate('Module.supertuxCoop.state.supportsRooms')
+            await host.evaluate('Module.supertuxCoop.enqueue([5,1,0,0])')
+        else:
+            await host.locator('#coop_panel').evaluate('(e)=>e.open=true')
+            await host.locator('#coop_forest').click()
         await host.wait_for_timeout(2000)
         await host.locator('#coop_panel').evaluate('(e)=>e.open=false')
         await host.locator('#canvas').focus()

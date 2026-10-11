@@ -1,5 +1,9 @@
 # Phase 8B: smoother private co-op presentation
 
+This records the original presentation milestone. Current phone entry is covered
+in [PRIVATE_COOP_HOST_JOIN.md](PRIVATE_COOP_HOST_JOIN.md); the original control
+labels and validation results below remain historical evidence.
+
 Implementation base: `mobile-web-audit` at
 `316292b337860a0545f56033ef2a1969d80f47e7` (merged Phase 8A PR #15).
 Frozen runtime tested locally: `5303342794e2fa7d844842d60d347abfb0a2ee6c`.

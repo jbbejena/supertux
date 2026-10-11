@@ -3,22 +3,31 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="referrer" content="no-referrer">
-  <title>SuperTux — shared display proof</title>
+  <title>SuperTux — Player 2</title>
   <style>
-    body {margin:0;background:#142333;color:white;font:16px system-ui;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);}
-    #guest_canvas {display:block;width:100%;height:55dvh;object-fit:contain;background:#070e17;}
-    p {margin:8px 12px;} button {font:inherit;min-width:56px;min-height:56px;margin:3px;border:2px solid #a5c7ed;border-radius:12px;background:#234362;color:white;touch-action:none;user-select:none;}
-    button:active {background:#406c94;} .controls {display:flex;flex-wrap:wrap;justify-content:space-between;padding:0 8px;} .pad {display:grid;grid-template-columns:repeat(3,62px);} .up {grid-column:2;} .left {grid-column:1;grid-row:2;} .down {grid-column:2;grid-row:2;} .right {grid-column:3;grid-row:2;}
-    @media (orientation:landscape) {#guest_canvas {height:55dvh;} .controls {align-items:center;}}
+    * {box-sizing:border-box;} html,body {height:100%;margin:0;overflow:hidden;overscroll-behavior:none;}
+    body {background:#142333;color:white;font:15px system-ui;}
+    main {display:flex;flex-direction:column;height:100%;height:100dvh;gap:6px;
+      padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px);}
+    #guest_canvas {display:block;width:100%;flex:1;min-height:60px;object-fit:contain;background:#070e17;}
+    p {margin:0 12px;} button {font:inherit;min-width:44px;min-height:44px;padding:6px;border:2px solid #a5c7ed;border-radius:10px;background:#234362;color:white;touch-action:none;user-select:none;-webkit-user-select:none;}
+    button:active {background:#406c94;} button:disabled {opacity:.6;} [hidden] {display:none!important;}
+    .controls {display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;align-items:center;padding:0 8px;flex-shrink:0;}
+    .pad {display:grid;gap:4px;grid-template-columns:repeat(3,44px);} .up {grid-column:2;} .left {grid-column:1;grid-row:2;} .down {grid-column:2;grid-row:2;} .right {grid-column:3;grid-row:2;}
+    .actions {display:flex;gap:4px;flex-wrap:wrap;} #guest_status {font-size:.85rem;min-height:2.4em;}
+    #view_status {padding-top:6px;font-weight:600;} #guest_progress {width:calc(100% - 24px);margin:0 12px;flex-shrink:0;}
+    #guest_join {align-self:center;touch-action:manipulation;} .help {margin:0 12px 6px;font-size:.8rem;max-height:25dvh;overflow:auto;flex-shrink:0;}
   </style>
 </head>
 <body>
-  <p id="view_status" role="status">Shared display proof · static scene and both players</p>
+  <main aria-label="SuperTux private co-op Player 2">
+  <p id="view_status" role="status">Welcome to Antarctica · Player 2</p>
   <canvas id="guest_canvas" width="844" height="390" aria-label="Host-authoritative shared view of both players"></canvas>
-  <p id="guest_status" role="status">Waiting for a private room link.</p>
-  <div class="controls"><div class="pad"><button class="up" data-control="4" aria-label="Up">↑</button><button class="left" data-control="1" aria-label="Left">←</button><button class="down" data-control="8" aria-label="Down">↓</button><button class="right" data-control="2" aria-label="Right">→</button></div><div><button data-control="16">Jump</button><button data-control="32">Action</button><button data-control="64">Item</button></div></div>
-  <p>The host selects levels, pauses and saves progress. Welcome to Antarctica and the display test arena are supported here. Keyboard: arrows/WASD, Space to jump, Ctrl for action.</p>
-  <p id="guest_ack"></p><button id="guest_join">Rejoin</button>
-  <p>Keep this invitation private. After disconnection, return the host to the title screen, rejoin, then restart the scene.</p>
+  <p id="guest_status" role="status" aria-live="polite">Checking your invitation…</p>
+  <progress id="guest_progress" hidden aria-label="Preparing Player 2 artwork"></progress>
+  <div class="controls" aria-label="Player 2 touch controls"><div class="pad"><button class="up" data-control="4" aria-label="Up">↑</button><button class="left" data-control="1" aria-label="Left">←</button><button class="down" data-control="8" aria-label="Down">↓</button><button class="right" data-control="2" aria-label="Right">→</button></div><div class="actions"><button data-control="16">Jump</button><button data-control="32">Action</button><button data-control="64">Item</button></div></div>
+  <p id="guest_ack" hidden></p><button id="guest_join" type="button">Retry joining</button>
+  <details class="help"><summary>How to play</summary><p>You control Player 2; the host controls Player 1, pauses and saves. Both players share the camera. Landscape gives more room. Keyboard: arrows/WASD, Space to jump, Ctrl for action.</p><p>Keep your invitation private. After a disconnect, ask the host to return to title and send a fresh invitation. Rooms last 15 minutes.</p></details>
+  </main>
   <script src="coop-view.js"></script><script src="coop.js"></script>
 </body></html>

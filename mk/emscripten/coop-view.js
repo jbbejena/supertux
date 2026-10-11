@@ -143,41 +143,62 @@
   const context = canvas.getContext('2d'), status = document.getElementById('view_status'), buffer = new SnapshotBuffer();
   let outcome = null, readyKey = null, tintCache = new Map(), scene, images = new Map(), enabled = false, generation = 0, drawn = null, loading = null, build = null, playable = false;
   const sha = async bytes => [...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(x=>x.toString(16).padStart(2,'0')).join('');
-  async function checked(url, entry, max) {
+  async function checked(url, entry, max, signal) {
     if (!entry || !Number.isInteger(entry.bytes) || entry.bytes < 0 || entry.bytes > max) throw Error('Incomplete shared view assets. Ask the host to update the preview.');
-    const response = await fetch(url,{signal:AbortSignal.timeout(15000)});
-    if (!response.ok) throw Error('Shared view download failed. Check your connection and tap Rejoin.');
+    const response = await fetch(url,{signal:AbortSignal.any([signal,AbortSignal.timeout(15000)])});
+    if (!response.ok) throw Error('Artwork download failed. Check your connection and tap Retry joining.');
     const bytes = await response.arrayBuffer();
     if (bytes.byteLength !== entry.bytes || await sha(bytes) !== entry.sha256) throw Error('Shared view assets changed. Reload both pages.');
     return bytes;
   }
-  async function prepare(config) {
-    if (build === config.manifestSha256 && scene) return;
-    if (loading) return loading;
+  async function prepare(config, {signal, onProgress = () => {}} = {}) {
+    signal?.throwIfAborted();
+    if (build === config.manifestSha256 && scene) {onProgress(1,1); return;}
+    if (loading) {
+      try {await loading;} catch {} // Retire a cancelled attempt before retry.
+      return prepare(config,{signal,onProgress});
+    }
+    const controller = new AbortController();
+    const combined = signal ? AbortSignal.any([signal,controller.signal]) : controller.signal;
     loading = (async () => {
-      status.textContent = 'Loading the shared display scene…';
-      const response = await fetch(config.manifestUrl,{signal:AbortSignal.timeout(15000)});
-      if (!response.ok) throw Error('Shared view manifest unavailable. Tap Rejoin to retry.');
+      status.textContent = 'Preparing Player 2’s view…';
+      const response = await fetch(config.manifestUrl,{signal:AbortSignal.any([combined,AbortSignal.timeout(15000)])});
+      if (!response.ok) throw Error('Artwork list unavailable. Tap Retry joining.');
       const bytes = await response.arrayBuffer();
       if (bytes.byteLength > 4*1024*1024 || await sha(bytes) !== config.manifestSha256) throw Error('Host and guest content differ. Request a new room link.');
       const manifest = JSON.parse(new TextDecoder().decode(bytes));
-      const parsed = JSON.parse(new TextDecoder().decode(await checked('coop-scene.json',manifest.frontend['coop-scene.json'],2*1024*1024)));
+      const parsed = JSON.parse(new TextDecoder().decode(await checked('coop-scene.json',manifest.frontend['coop-scene.json'],2*1024*1024,combined)));
       if (parsed.schema !== 1 || parsed.id !== 'coop-view-v1') throw Error('Unsupported shared view scene.');
       const urls = [...new Set([parsed.tileImage,...Object.values(parsed.actions).flatMap(action=>action.frames),...Object.values(parsed.campaign.textures)])];
-      const loaded = new Map(); let index = 0;
-      await Promise.all(Array.from({length:4},async () => {
-        while (index < urls.length) {
-          const url = urls[index++];
-          if (!/^coop-art\/[a-f0-9]{64}\.png$/.test(url)) throw Error('Invalid shared view asset path.');
-          const bytes = await checked(url,manifest.frontend[url],2*1024*1024);
-          const blobUrl = URL.createObjectURL(new Blob([bytes],{type:'image/png'}));
-          try {
-            const image = new Image(); image.src = blobUrl; await image.decode(); loaded.set(url,image);
-          } finally {URL.revokeObjectURL(blobUrl);}
-        }
+      const total = urls.reduce((sum,url) => {
+        const bytes = manifest.frontend[url]?.bytes;
+        if (!Number.isInteger(bytes) || bytes < 0 || bytes > 2*1024*1024) throw Error('Incomplete artwork. Ask the host to update the preview.');
+        return sum + bytes;
+      },0);
+      const loaded = new Map(); let index = 0, completed = 0;
+      onProgress(0,total);
+      // Retire every worker before retry is possible. A failed sibling must
+      // never continue downloading or publish a partially prepared scene.
+      const results = await Promise.allSettled(Array.from({length:4},async () => {
+        try {
+          while (index < urls.length) {
+            combined.throwIfAborted();
+            const url = urls[index++];
+            if (!/^coop-art\/[a-f0-9]{64}\.png$/.test(url)) throw Error('Invalid shared view asset path.');
+            const bytes = await checked(url,manifest.frontend[url],2*1024*1024,combined);
+            const blobUrl = URL.createObjectURL(new Blob([bytes],{type:'image/png'}));
+            try {
+              const image = new Image(); image.src = blobUrl; await image.decode(); combined.throwIfAborted(); loaded.set(url,image);
+              completed += bytes.byteLength; onProgress(completed,total);
+            } finally {URL.revokeObjectURL(blobUrl);}
+          }
+        } catch (error) {controller.abort(error); throw error;}
       }));
+      const failure = results.find(result => result.status === 'rejected');
+      if (failure) throw controller.signal.reason || failure.reason;
+      combined.throwIfAborted();
       scene = parsed; images = loaded; build = config.manifestSha256;
-      status.textContent = 'Shared display ready. Waiting for the host.';
+      status.textContent = 'Artwork ready. Waiting for the host.';
     })();
     try {await loading;} finally {loading = null;}
   }

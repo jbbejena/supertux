@@ -3,6 +3,8 @@
 This document records the original static-arena milestone. The subsequent
 [Phase 7B handoff](PRIVATE_COOP_SUPPORTED_LEVEL.md) covers the supported
 Welcome to Antarctica campaign level and its native object/drawing baselines.
+Use [PRIVATE_COOP_HOST_JOIN.md](PRIVATE_COOP_HOST_JOIN.md) for current phone
+entry; the instructions below describe the original diagnostic milestone.
 
 Based on merged input-proof PR #11, browser integration commit
 `f7c436e3bcb12363c5f193bd50b28f4d2ee691f7`. The implementation branch is

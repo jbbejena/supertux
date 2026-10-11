@@ -16,8 +16,12 @@ const json = (body, status = 200) => new Response(JSON.stringify(body), {
 const secret = () => Array.from(crypto.getRandomValues(new Uint8Array(32)), x => x.toString(16).padStart(2, '0')).join('');
 
 export async function coopFetch(request, env) {
-  if (!env.COOP_ROOMS) return new Response('Private input proof is not enabled on this server.', {status: 404});
   const url = new URL(request.url);
+  // Read-only discovery has no credentials or room state. Same-origin browser
+  // GETs need not carry Origin; all room mutations remain origin-bound below.
+  if (url.pathname === '/coop/capabilities.json' && request.method === 'GET')
+    return json({rooms: !!env.COOP_ROOMS, protocol: PROTOCOL});
+  if (!env.COOP_ROOMS) return new Response('Private input proof is not enabled on this server.', {status: 404});
   // Browser credentials are origin-bound. No permissive CORS or URL tokens.
   if (request.headers.get('Origin') !== url.origin) return json({error: 'Origin rejected'}, 403);
   if (url.pathname === '/coop/rooms' && request.method === 'POST') {

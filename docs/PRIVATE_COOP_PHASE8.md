@@ -15,6 +15,11 @@ invitation versus active-session expiry still remain in 8D.
 
 ## Order of work
 
+The Phase 8C Host/Join implementation and normal-entry validation are described
+in [PRIVATE_COOP_HOST_JOIN.md](PRIVATE_COOP_HOST_JOIN.md). Recovery PR #17 is
+merged, and the refreshed private recovery baseline passes both hosted browsers;
+physical-phone acceptance remains outstanding.
+
 | Stage | Deliverable | Acceptance |
 | --- | --- | --- |
 | 8A | Exact staging runtime and repeatable measurements | Verified build identity, browser evidence and before-change response/loading/traffic measurements |

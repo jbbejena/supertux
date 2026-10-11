@@ -1,5 +1,22 @@
 # Private co-op: HTTPS staging and phone acceptance
 
+## Current staging and Host/Join
+
+Recovery PR #17 is merged into `mobile-web-audit`. Private staging refresh
+[38105080282](https://github.com/jbbejena/supertux/actions/runs/38105080282)
+publishes exact tested runtime `e7fe8aa180e5dcbe900cd14c833464256ba5f323` and passes
+delivery readiness plus all 24 shared-view checks in each of hosted Chromium
+and Linux WebKit. This supersedes the older publications recorded below.
+Normal **Mobile Web Deploy** still updates only the main game Worker.
+
+The [Phase 8C Host/Join handoff](PRIVATE_COOP_HOST_JOIN.md) describes the new
+**Host game → Share/Copy invitation → Player 2 ready → Start together** flow,
+its progress/retry, publication requirements and remaining device checks.
+Check `BUILD_INFO.json` and the publication summary before assuming staging
+serves that candidate. Physical-phone acceptance below remains unverified.
+
+## Historical recovery publications
+
 The [private HTTPS host](https://supertux-private-input-proof.jshbjnr.workers.dev/index.html?coop=1)
 is separate from production. The final recovery/save-correction runtime is
 `52d8bf370bee4b97b1a943beec695274fb13b518`, based on merged Phase 8B at
@@ -149,11 +166,15 @@ Staging is a separate origin, with its own browser saves/settings and asset
 cache. Production saves are not imported. The entire room currently expires after
 15 minutes, including active play; create a new room for a longer testing session.
 
-1. Phone A: use Start, expand **Private co-op**, then **Create room**.
-2. Share **Guest shared view** with Phone B. That invitation contains a temporary
-   guest credential; keep it private. Wait for Player 2 to join.
-3. On the newly published supported-level runtime, Phone A chooses **Play Welcome to
-   Antarctica**. Both screens should show the original level and both players.
+1. Phone A: use Start, expand **Private co-op**, then **Host game** (**Create room**
+   on the older recovery runtime). The main game Worker must not advertise rooms.
+2. Use **Share invitation** or **Copy invitation** to send Phone B its private
+   Player 2 link (**Guest shared view** on the older runtime). Check native share
+   cancellation and the selected-field fallback when clipboard access is denied.
+   Phone B should show artwork progress and actionable retry after a failed load.
+3. Wait for **Player 2 ready**, then Phone A chooses **Start together** (**Play
+   Welcome to Antarctica** on the older runtime). Starting must remain unavailable
+   while Phone B prepares artwork. Both screens show the original level and players.
    Phone A controls Player 1; Phone B controls Player 2. The older Phase 7A URL
    only offers **Start shared view proof**, a static diagnostic arena.
 4. Try movement, Jump and independent finger releases. Move apart and confirm

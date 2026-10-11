@@ -41,11 +41,16 @@ def verify(directory, source_commit, configuration='Release'):
             assert payload.stat().st_size == variant['bytes'] and digest(payload) == variant['sha256'], 'Compressed package mismatch'
     assert digest(directory / 'assets.js') == manifest['bootstrapSha256'], 'Bootstrap hash mismatch'
     required = {'coop.js', 'coop-controller.html', 'coop-view.js', 'coop-view.html', 'coop-scene.json'}
+    # Older exact artifacts did not discover rooms. The payload is mandatory
+    # whenever that runtime's verified frontend requests it.
+    if 'coop/capabilities.json' in (directory / 'coop.js').read_text():
+        required.add('coop/capabilities.json')
     assert required <= set(manifest['frontend']), 'Incomplete co-op frontend'
     for name in manifest['frontend']:
-        assert name in required or re.fullmatch(r'coop-art/[a-f0-9]{64}\.png', name), 'Noncanonical presentation URL'
+        assert name in required or name == 'coop/capabilities.json' or re.fullmatch(r'coop-art/[a-f0-9]{64}\.png', name), 'Noncanonical presentation URL'
     for name, entry in manifest['frontend'].items():
         payload = directory / name
+        assert payload.is_file(), 'Missing frontend payload: ' + name
         assert payload.stat().st_size == entry['bytes'] and digest(payload) == entry['sha256'], 'Diagnostic frontend mismatch: ' + name
         if name.startswith('coop-art/'):
             assert name == 'coop-art/' + entry['sha256'] + '.png', 'Presentation asset identity mismatch'

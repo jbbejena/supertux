@@ -9,10 +9,12 @@ function target(extra = {}) {
   return Object.assign({addEventListener(name, fn) {listeners.set(name, fn);},
     async fire(name, value = {}) {return listeners.get(name)?.(value);}}, extra);
 }
-function fixture(guest = false, fetch = async () => {throw Error('Unexpected fetch');}, clock = Date) {
+function fixture(guest = false, fetch = async () => {throw Error('Unexpected fetch');}, clock = Date, rooms = true, extra = {}) {
   const elements = new Map(['coop_status','coop_panel','coop_create','coop_close','coop_link',
-    'coop_antarctica','coop_forest','coop_restart',...(guest ? ['guest_status','guest_join','guest_ack'] : [])]
-    .map(id => [id, target({textContent: ''})]));
+    'coop_antarctica','coop_forest','coop_restart','coop_view_link','coop_invite','coop_manual','coop_invitation',
+    'coop_share_status','coop_share','coop_copy','coop_join_form','coop_join_url','coop_join_invitation','coop_join_status','coop_diagnostics',
+    ...(guest ? ['guest_status','guest_join','guest_ack','guest_progress'] : [])]
+    .map(id => [id, target({textContent: '',value:'',focus(){},select(){},removeAttribute(){}})]));
   const sockets = [];
   class Socket {
     static OPEN = 1; static CLOSED = 3;
@@ -21,12 +23,14 @@ function fixture(guest = false, fetch = async () => {throw Error('Unexpected fet
     close() {this.readyState = 3;}
   }
   const document = target({hidden: false, getElementById: id => elements.get(id), querySelectorAll: () => []});
-  const window = target({document, TextEncoder, URL, URLSearchParams, WebSocket: Socket, AbortSignal, fetch, performance, Date: clock,
+  const request = async (url, options) => url === '/coop/capabilities.json' ? {ok:rooms,json:async()=>({rooms,protocol:2})} : fetch(url, options);
+  const window = target({document, TextEncoder, URL, URLSearchParams, WebSocket: Socket, AbortSignal, AbortController, fetch:request, performance, Date: clock,
     location: {href: 'http://localhost/index.html', protocol: 'http:', search: '?coop=1',
       hash: '#'+new URLSearchParams({room:'a'.repeat(32),token:'b'.repeat(64),build:'c'.repeat(64)}).toString()},
     SUPERTUX_DEPLOY_CONFIG: {manifestSha256: 'c'.repeat(64)},
     setInterval: () => 1, clearInterval: () => {}, setTimeout, clearTimeout});
   if (!guest) window.Module = {supertuxReady: true, supertuxShell: {active: true, resetInput() {}, pause(reason) {this.active = false; this.reason = reason;}}};
+  Object.assign(window,extra);
   window.window = window;
   vm.runInNewContext(source, window);
   return {window, document, elements, sockets};
@@ -39,6 +43,87 @@ test('host queue preserves taps and fails neutral on overflow', () => {
   assert.deepEqual(Array.from(input.poll()), [2,1,2,0]);
   for (let i=0;i<33;i++) input.enqueue([2,1,i+1,i%2]);
   assert.deepEqual(Array.from(input.poll()), [4,0,0,0]); assert.equal(input.poll(), undefined);
+});
+
+const roomResponse = async () => ({ok:true,json:async()=>({room:'a'.repeat(32),guest:'b'.repeat(64),host:'d'.repeat(64),build:'c'.repeat(64)})});
+const identityResponse = async () => ({ok:true,text:async()=>'<script>window.SUPERTUX_DEPLOY_CONFIG = '+JSON.stringify({manifestSha256:'c'.repeat(64)})+';</script>'});
+
+test('room capability controls entry; a query flag does not advertise an unsupported server', async () => {
+  for (const rooms of [true,false]) {
+    const f=fixture(false,roomResponse,Date,rooms);
+    await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(f.elements.get('coop_panel').hidden,!rooms);
+    assert.equal(f.elements.get('coop_create').disabled,!rooms);
+    assert.equal(f.elements.get('coop_diagnostics').hidden,true);
+  }
+});
+
+test('Start together waits for verified shared-view ownership and repeated taps queue one level', async () => {
+  const f=fixture(false,roomResponse),engine=f.window.Module.supertuxCoop,start=f.elements.get('coop_antarctica');
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(start.disabled,true);
+  await start.fire('click');assert.equal(engine.poll(),undefined);
+  await f.elements.get('coop_create').fire('click');
+  const socket=f.sockets[0],receive=value=>socket.fire('message',{data:JSON.stringify(value)});
+  await receive({type:'ready'});assert.equal(start.disabled,true);
+  assert.equal(f.elements.get('coop_invite').hidden,false);
+  assert.equal(f.elements.get('coop_view_link').textContent,'Open Player 2 invitation');
+  await receive({type:'peer',connected:true,view:false});engine.engineStatus(1,false,1,0);
+  assert.equal(start.disabled,true,'A controller-only peer is not a shared-view guest');
+  await receive({type:'peer',connected:true,view:true});engine.engineStatus(1,false,2,0);
+  assert.equal(start.disabled,false);assert.equal(engine.state.guestReady,true);
+  await start.fire('click');await start.fire('click');
+  assert.deepEqual(Array.from(engine.poll()),[5,0,0,0]);assert.equal(engine.poll(),undefined);
+  assert.equal(start.disabled,true);assert.equal(f.elements.get('coop_panel').open,false);
+  await receive({type:'peer',connected:false});assert.equal(engine.state.guestReady,false);
+  assert.equal(f.elements.get('coop_invite').hidden,true);
+});
+
+test('copy denial offers selected invitation; sharing cancellation does not change room ownership', async () => {
+  const f=fixture(false,roomResponse);
+  await f.elements.get('coop_create').fire('click');await f.sockets[0].fire('message',{data:JSON.stringify({type:'ready'})});
+  await f.elements.get('coop_copy').fire('click');assert.equal(f.elements.get('coop_manual').hidden,false);
+  const invitation=f.elements.get('coop_invitation').value;assert.ok(invitation.includes('coop-view.html#room='));
+  let copied,shared;
+  f.window.navigator={clipboard:{writeText:async text=>{copied=text;}},share:async value=>{shared=value;throw Object.assign(Error('Cancelled'),{name:'AbortError'});}};
+  await f.elements.get('coop_copy').fire('click');assert.equal(copied,invitation);
+  assert.match(f.elements.get('coop_share_status').textContent,/copied/);
+  await f.elements.get('coop_share').fire('click');assert.equal(shared.url,invitation);
+  assert.equal(f.window.Module.supertuxCoop.connection.closed,false);
+  await f.elements.get('coop_close').fire('click');assert.equal(f.elements.get('coop_invitation').value,'');
+});
+
+test('Join game rejects other origins, credentials, controller links and malformed invitations', async () => {
+  const f=fixture(),input=f.elements.get('coop_join_url');let navigation;
+  f.window.location.assign=url=>navigation=url;
+  const valid='http://localhost/coop-view.html'+f.window.location.hash;
+  for (const text of [valid.replace('localhost','other.example'),valid.replace('http://','http://user:pass@'),valid.replace('coop-view','coop-controller'),valid+'0','javascript:alert(1)']) {
+    input.value=text;await f.elements.get('coop_join_invitation').fire('click');assert.equal(navigation,undefined);
+  }
+  input.value=valid;await f.elements.get('coop_join_invitation').fire('click');assert.equal(navigation,valid);
+});
+
+test('failed guest artwork cannot connect; retry becomes ready after complete preparation', async () => {
+  let attempts=0;
+  const view={state:{latest:null},reset(){},async prepare(_,options){options.onProgress(2,4);if (++attempts===1) throw Error('Artwork download failed. Retry joining.');}};
+  const f=fixture(true,identityResponse,Date,true,{SupertuxView:view});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(f.sockets.length,0);assert.equal(f.elements.get('guest_join').disabled,false);
+  assert.match(f.elements.get('guest_status').textContent,/Retry joining/);
+  await f.elements.get('guest_join').fire('click');assert.equal(f.sockets.length,1);assert.equal(attempts,2);
+  await f.sockets[0].fire('message',{data:JSON.stringify({type:'ready'})});
+  assert.equal(f.elements.get('guest_join').hidden,true);assert.equal(f.elements.get('guest_progress').hidden,true);
+  assert.match(f.elements.get('guest_status').textContent,/Player 2 ready/);
+});
+
+test('backgrounding aborts guest preparation and a late completion owns no connection', async () => {
+  let complete,signal;
+  const view={state:{latest:null},reset(){},prepare(_,options){signal=options.signal;return new Promise(resolve=>complete=resolve);}};
+  const f=fixture(true,identityResponse,Date,true,{SupertuxView:view});
+  await new Promise(resolve=>setImmediate(resolve));
+  f.document.hidden=true;await f.document.fire('visibilitychange');assert.equal(signal.aborted,true);
+  complete();await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(f.sockets.length,0);assert.equal(f.elements.get('guest_join').disabled,false);
 });
 
 test('blur between peer notification and native poll retires controls without losing attach or detach', async () => {
@@ -77,7 +162,7 @@ test('guest background prevents a pending identity fetch opening a late socket',
   let complete;
   const f = fixture(true, () => new Promise(resolve => complete = resolve));
   f.document.hidden = true; await f.document.fire('visibilitychange');
-  complete({text:async()=>'<script>window.SUPERTUX_DEPLOY_CONFIG = '+JSON.stringify({manifestSha256:'c'.repeat(64)})+';</script>'});
+  complete({ok:true,text:async()=>'<script>window.SUPERTUX_DEPLOY_CONFIG = '+JSON.stringify({manifestSha256:'c'.repeat(64)})+';</script>'});
   await new Promise(resolve=>setImmediate(resolve));
   assert.equal(f.sockets.length,0); assert.equal(f.window.supertuxGuest.state.enabled,false);
 });
@@ -128,7 +213,7 @@ test('native frame stall pauses before input consumption; recovery needs a fresh
 });
 
 test('guest heartbeat interruption discards held keys and cannot be bypassed by delayed enabled status', async () => {
-  const f=fixture(true,async()=>({text:async()=>'<script>window.SUPERTUX_DEPLOY_CONFIG = '+JSON.stringify({manifestSha256:'c'.repeat(64)})+';</script>'}));
+  const f=fixture(true,async()=>({ok:true,text:async()=>'<script>window.SUPERTUX_DEPLOY_CONFIG = '+JSON.stringify({manifestSha256:'c'.repeat(64)})+';</script>'}));
   await new Promise(resolve=>setImmediate(resolve));
   const socket=f.sockets[0], receive=value=>socket.fire('message',{data:JSON.stringify(value)});
   await receive({type:'ready'});await receive({type:'session',generation:2,enabled:true});
@@ -141,7 +226,7 @@ test('guest heartbeat interruption discards held keys and cannot be bypassed by 
 });
 
 test('a new invitation in the same guest tab neutralizes the old room and reloads its credentials', async () => {
-  const f=fixture(true,async()=>({text:async()=>'<script>window.SUPERTUX_DEPLOY_CONFIG = '+JSON.stringify({manifestSha256:'c'.repeat(64)})+';</script>'}));
+  const f=fixture(true,async()=>({ok:true,text:async()=>'<script>window.SUPERTUX_DEPLOY_CONFIG = '+JSON.stringify({manifestSha256:'c'.repeat(64)})+';</script>'}));
   await new Promise(resolve=>setImmediate(resolve));
   const socket=f.sockets[0],receive=value=>socket.fire('message',{data:JSON.stringify(value)});
   await receive({type:'ready'});await receive({type:'session',generation:2,enabled:true});
@@ -160,7 +245,7 @@ test('invitation change retires an identity fetch still pending for the old room
   let fetched,reloads=0;
   const f=fixture(true,()=>new Promise(resolve=>fetched=resolve));
   f.window.location.reload=()=>++reloads;await f.window.fire('hashchange');
-  fetched({text:async()=>'<script>window.SUPERTUX_DEPLOY_CONFIG = '+JSON.stringify({manifestSha256:'c'.repeat(64)})+';</script>'});
+  fetched({ok:true,text:async()=>'<script>window.SUPERTUX_DEPLOY_CONFIG = '+JSON.stringify({manifestSha256:'c'.repeat(64)})+';</script>'});
   await new Promise(resolve=>setImmediate(resolve));
   assert.equal(reloads,1);assert.equal(f.sockets.length,0);
 });

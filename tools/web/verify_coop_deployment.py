@@ -65,6 +65,14 @@ def fetch(base, path, deadline, method='GET', limit=4 * 1024 * 1024, data=None):
 
 
 def checked_file(base, path, entry, deadline):
+    if path == 'coop/capabilities.json':
+        # The artifact's static fallback reports no rooms. This one bounded
+        # route is live server configuration, not a presentation payload.
+        _, headers, body = fetch(base, path, deadline, limit=256)
+        require(headers.get('Content-Type', '').split(';')[0].lower() == 'application/json', 'Room discovery MIME mismatch')
+        require(headers.get('Cache-Control') == 'no-store', 'Room discovery must not be cached')
+        require(json.loads(body) == {'rooms': True, 'protocol': 2}, 'Private room discovery is unavailable')
+        return
     _, headers, body = fetch(base, path, deadline, limit=entry['bytes'])
     require(len(body) == entry['bytes'] and hashlib.sha256(body).hexdigest() == entry['sha256'], 'Hosted frontend content mismatch: ' + path)
     expected = 'image/png' if path.endswith('.png') else 'application/json' if path.endswith('.json') else 'text/html' if path.endswith('.html') else 'javascript'
