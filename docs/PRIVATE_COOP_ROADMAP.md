@@ -1,6 +1,6 @@
 # SuperTux private browser co-op roadmap
 
-Updated: 2026-10-09 UTC.
+Updated: 2026-10-11 UTC.
 
 Phase 8C's guided phone Host/Join flow is described in
 [PRIVATE_COOP_HOST_JOIN.md](PRIVATE_COOP_HOST_JOIN.md). The merged recovery

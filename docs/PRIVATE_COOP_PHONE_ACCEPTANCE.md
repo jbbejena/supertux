@@ -166,11 +166,15 @@ Staging is a separate origin, with its own browser saves/settings and asset
 cache. Production saves are not imported. The entire room currently expires after
 15 minutes, including active play; create a new room for a longer testing session.
 
-1. Phone A: use Start, expand **Private co-op**, then **Create room**.
-2. Share **Guest shared view** with Phone B. That invitation contains a temporary
-   guest credential; keep it private. Wait for Player 2 to join.
-3. On the newly published supported-level runtime, Phone A chooses **Play Welcome to
-   Antarctica**. Both screens should show the original level and both players.
+1. Phone A: use Start, expand **Private co-op**, then **Host game** (**Create room**
+   on the older recovery runtime). The main game Worker must not advertise rooms.
+2. Use **Share invitation** or **Copy invitation** to send Phone B its private
+   Player 2 link (**Guest shared view** on the older runtime). Check native share
+   cancellation and the selected-field fallback when clipboard access is denied.
+   Phone B should show artwork progress and actionable retry after a failed load.
+3. Wait for **Player 2 ready**, then Phone A chooses **Start together** (**Play
+   Welcome to Antarctica** on the older runtime). Starting must remain unavailable
+   while Phone B prepares artwork. Both screens show the original level and players.
    Phone A controls Player 1; Phone B controls Player 2. The older Phase 7A URL
    only offers **Start shared view proof**, a static diagnostic arena.
 4. Try movement, Jump and independent finger releases. Move apart and confirm
