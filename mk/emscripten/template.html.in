@@ -185,7 +185,9 @@
                env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
       background: black;
     }
-    #game_area { position: relative; width: 100%; height: 100%; overflow: hidden; }
+    #game_area { position: relative; width: 100%; height: 100%; overflow: hidden;
+      /* Cover labels/overlays as well as SDL's canvas on touch browsers. */
+      user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
     #canvas {
       width: 100% !important; height: 100% !important; outline: none;
       touch-action: none; user-select: none; -webkit-user-select: none;
@@ -203,6 +205,8 @@
     button:disabled { opacity: .6; cursor: wait; }
     /* game_shell applies safe areas once; constrain this child to game_area. */
     #coop_panel { position: absolute; top: 0; right: 0; z-index: 6;
+      /* Invitation fields and links still need ordinary Copy/Paste. */
+      user-select: text; -webkit-user-select: text; -webkit-touch-callout: default;
       max-width: calc(100% - 16px); max-height: calc(100% - 16px); overflow: auto; margin: 8px; padding: 8px 12px;
       background: #142333; color: white; border: 1px solid #a5c7ed; border-radius: 12px; font: 1rem system-ui; }
     #coop_panel[open] { width: 440px; }

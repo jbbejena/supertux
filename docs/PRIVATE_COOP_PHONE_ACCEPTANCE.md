@@ -2,11 +2,13 @@
 
 ## Current staging and Host/Join
 
-Recovery PR #17 is merged into `mobile-web-audit`. Private staging refresh
-[38105080282](https://github.com/jbbejena/supertux/actions/runs/38105080282)
-publishes exact tested runtime `e7fe8aa180e5dcbe900cd14c833464256ba5f323` and passes
-delivery readiness plus all 24 shared-view checks in each of hosted Chromium
-and Linux WebKit. This supersedes the older publications recorded below.
+Host/Join PR #18 is merged into `mobile-web-audit` at
+`a1b238334fdfdc8bc2fe8f731d2cf9b327808d1b`. Private staging refresh
+[38110972906](https://github.com/jbbejena/supertux/actions/runs/38110972906)
+publishes exact tested runtime `69576512df6e4f22b209fa2dd1748808dd2d673c`
+(the same source tree as that merge) and passes delivery readiness plus all
+24 shared-view and six lobby checks in each of hosted Chromium and Linux WebKit.
+This supersedes the older publications recorded below.
 Normal **Mobile Web Deploy** still updates only the main game Worker.
 
 The [Phase 8C Host/Join handoff](PRIVATE_COOP_HOST_JOIN.md) describes the new
@@ -179,6 +181,10 @@ cache. Production saves are not imported. The entire room currently expires afte
    only offers **Start shared view proof**, a static diagnostic arena.
 4. Try movement, Jump and independent finger releases. Move apart and confirm
    both living players remain visible through the native shared camera.
+   On iPhone Safari, tap Jump repeatedly, hold it, and slide a held finger off
+   the button before releasing, on both host and guest. No text handles or
+   Copy/Paste callout should appear, and release must stop holding Jump. Still
+   verify manual invitation copy and Join-field paste in the host panel.
 5. Pause/resume on the host, rotate each phone, and inspect safe areas and control
    visibility. Release fingers before continuing; old held inputs must not replay.
 6. Hold movement while briefly interrupting the host/connection. On the recovery

@@ -72,6 +72,9 @@ async def run(args, url):
             await host.locator('#coop_copy').tap()
             assert await host.locator('#coop_manual').is_visible()
             assert await host.evaluate("document.querySelector('#coop_invitation').selectionEnd===document.querySelector('#coop_invitation').value.length")
+            await host.locator('#coop_manual label').dblclick()
+            assert await host.evaluate('getSelection().toString().trim().length>0')
+            await host.locator('#coop_copy').tap()
             report['checks'].append('Normal entry discovers rooms, hides diagnostics, creates one invitation and safely handles simulated Share cancellation / clipboard denial')
 
             await guest.route('**/coop-art/*.png',fail_one_artwork)
@@ -108,6 +111,26 @@ async def run(args, url):
             await guest.wait_for_function("SupertuxView.state.drawn.players[1].action.includes('jump')")
             assert await guest.evaluate('supertuxGuest.state.mask') == 0
             report['checks'].append('Player 2 movement and trusted touch Jump reach the authoritative host; releasing the touch leaves neutral input')
+
+            # Exercise the play-surface selection boundary and captured input.
+            # Desktop WebKit cannot observe iOS's native long-press callout.
+            await guest.evaluate('getSelection().removeAllRanges()')
+            await guest.locator('#guest_status').dblclick()
+            assert await guest.evaluate('getSelection().toString()') == ''
+            jump = await guest.locator('[data-control="16"]').bounding_box()
+            await guest.mouse.move(jump['x']+jump['width']/2,jump['y']+jump['height']/2)
+            await guest.mouse.down()
+            await guest.wait_for_function('supertuxGuest.state.mask===16')
+            await guest.wait_for_timeout(800)
+            await guest.mouse.move(12,12,steps=8)
+            assert await guest.evaluate('supertuxGuest.state.mask') == 16
+            await guest.mouse.up()
+            await guest.wait_for_function('supertuxGuest.state.mask===0')
+            assert await guest.evaluate('getSelection().toString()') == ''
+            for _ in range(3):
+                await guest.locator('[data-control="16"]').tap()
+                assert await guest.evaluate('supertuxGuest.state.mask') == 0
+            report['checks'].append('Guest play labels cannot be selected; held Jump survives a drag off the button and releases neutrally; repeated touch taps leave no held input (OS callout unverified)')
 
             async def layout():
                 return await guest.evaluate('''() => [...document.querySelectorAll('[data-control]')].every(e=>{
