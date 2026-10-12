@@ -39,7 +39,7 @@ class DeploymentTests(unittest.TestCase):
         root = Path(directory); frontend = root / 'frontend'; frontend.mkdir()
         manifest = {'sourceCommit': 'a' * 40, 'frontend': {}, 'packages': {}}
         contents = {'assets.js': b'bootstrap', 'supertux2.js': b'javascript',
-                    'coop-view.js': b'view', 'coop/capabilities.json': b'{"rooms":false,"protocol":2}',
+                    'coop-view.js': b'view', 'coop/capabilities.json': b'{"rooms":false,"protocol":3}',
                     'coop-art/' + 'b' * 64 + '.png': b'png'}
         for name, data in contents.items():
             entry = {'bytes': len(data), 'sha256': hashlib.sha256(data).hexdigest()}
@@ -74,7 +74,7 @@ class DeploymentTests(unittest.TestCase):
                 elif self.path == config['manifestUrl']: self.respond(encoded, 'application/json')
                 elif self.path == '/': self.respond(page.encode(), 'text/html')
                 elif self.path == '/coop/capabilities.json':
-                    value={'rooms':tamper != 'capabilities','protocol':2}
+                    value={'rooms':tamper != 'capabilities','protocol':3}
                     if tamper == 'capabilities-extra': value['unexpected']=True
                     self.respond(json.dumps(value).encode(), 'text/html' if tamper == 'capabilities-mime' else 'application/json',
                                  cache='public' if tamper == 'capabilities-cache' else 'no-store')
@@ -93,9 +93,9 @@ class DeploymentTests(unittest.TestCase):
             def do_POST(self):
                 requests.append(('POST', self.path))
                 value = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
-                if tamper == 'rooms' or self.headers['Origin'] != base or value != {'protocol': 2, 'build': config['manifestSha256']}:
+                if tamper == 'rooms' or self.headers['Origin'] != base or value != {'protocol': 3, 'build': config['manifestSha256']}:
                     self.send_error(403); return
-                data = json.dumps({'protocol': 2, 'build': value['build'], 'room': 'e' * 32,
+                data = json.dumps({'protocol': 3, 'build': value['build'], 'room': 'e' * 32,
                                    'host': 'f' * 64, 'guest': '1' * 64}).encode()
                 self.send_response(201); self.send_header('Content-Length', str(len(data)))
                 self.end_headers(); self.wfile.write(data)

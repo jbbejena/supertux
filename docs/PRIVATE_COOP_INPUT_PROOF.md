@@ -1,5 +1,10 @@
 # Private browser input proof
 
+This records the original protocol-2 milestone. Current entry is in
+[PRIVATE_COOP_HOST_JOIN.md](PRIVATE_COOP_HOST_JOIN.md); the
+[room-lifetime candidate](PRIVATE_COOP_ROOM_LIFETIME.md) uses protocol 3 and new
+invitation/session/idle deadlines. Its publication is a separate acceptance gate.
+
 This implements roadmap phases 5, 6A and the contained 6B input proof. The host
 runs the complete game and shows both players. The guest is a diagnostic
 keyboard/button controller: it downloads no game world, WASM, DATA or soundtrack,

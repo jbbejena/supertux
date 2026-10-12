@@ -71,7 +71,7 @@ def checked_file(base, path, entry, deadline):
         _, headers, body = fetch(base, path, deadline, limit=256)
         require(headers.get('Content-Type', '').split(';')[0].lower() == 'application/json', 'Room discovery MIME mismatch')
         require(headers.get('Cache-Control') == 'no-store', 'Room discovery must not be cached')
-        require(json.loads(body) == {'rooms': True, 'protocol': 2}, 'Private room discovery is unavailable')
+        require(json.loads(body) == {'rooms': True, 'protocol': 3}, 'Private room discovery is unavailable')
         return
     _, headers, body = fetch(base, path, deadline, limit=entry['bytes'])
     require(len(body) == entry['bytes'] and hashlib.sha256(body).hexdigest() == entry['sha256'], 'Hosted frontend content mismatch: ' + path)
@@ -110,9 +110,9 @@ def verify_once(base, directory, frontend, expected, payloads, deadline):
         list(pool.map(lambda item: checked_payload(base, item, deadline), payloads.items()))
     # Exercise the binding and origin policy without exposing role credentials.
     status, _, body = fetch(base, 'coop/rooms', deadline, method='POST', limit=4096,
-                            data=json.dumps({'protocol': 2, 'build': config['manifestSha256']}).encode())
+                            data=json.dumps({'protocol': 3, 'build': config['manifestSha256']}).encode())
     room = json.loads(body)
-    require(status == 201 and room.get('protocol') == 2 and room.get('build') == config['manifestSha256'] and
+    require(status == 201 and room.get('protocol') == 3 and room.get('build') == config['manifestSha256'] and
             re.fullmatch('[a-f0-9]{32}', room.get('room', '')) and
             all(re.fullmatch('[a-f0-9]{64}', room.get(role, '')) for role in ('host', 'guest')) and
             room['host'] != room['guest'], 'Co-op room creation or role binding failed')

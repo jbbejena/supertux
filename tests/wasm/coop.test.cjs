@@ -10,10 +10,10 @@ function target(extra = {}) {
     async fire(name, value = {}) {return listeners.get(name)?.(value);}}, extra);
 }
 function fixture(guest = false, fetch = async () => {throw Error('Unexpected fetch');}, clock = Date, rooms = true, extra = {}) {
-  const elements = new Map(['coop_status','coop_panel','coop_create','coop_close','coop_link',
+  const elements = new Map(['coop_status','coop_lifetime','coop_panel','coop_create','coop_close','coop_link',
     'coop_antarctica','coop_forest','coop_restart','coop_view_link','coop_invite','coop_manual','coop_invitation',
     'coop_share_status','coop_share','coop_copy','coop_join_form','coop_join_url','coop_join_invitation','coop_join_status','coop_diagnostics',
-    ...(guest ? ['guest_status','guest_join','guest_ack','guest_progress'] : [])]
+    ...(guest ? ['guest_status','guest_lifetime','guest_join','guest_ack','guest_progress'] : [])]
     .map(id => [id, target({textContent: '',value:'',focus(){},select(){},removeAttribute(){}})]));
   const sockets = [];
   class Socket {
@@ -23,7 +23,7 @@ function fixture(guest = false, fetch = async () => {throw Error('Unexpected fet
     close() {this.readyState = 3;}
   }
   const document = target({hidden: false, getElementById: id => elements.get(id), querySelectorAll: () => []});
-  const request = async (url, options) => url === '/coop/capabilities.json' ? {ok:rooms,json:async()=>({rooms,protocol:2})} : fetch(url, options);
+  const request = async (url, options) => url === '/coop/capabilities.json' ? {ok:rooms,json:async()=>({rooms,protocol:3})} : fetch(url, options);
   const window = target({document, TextEncoder, URL, URLSearchParams, WebSocket: Socket, AbortSignal, AbortController, fetch:request, performance, Date: clock,
     location: {href: 'http://localhost/index.html', protocol: 'http:', search: '?coop=1',
       hash: '#'+new URLSearchParams({room:'a'.repeat(32),token:'b'.repeat(64),build:'c'.repeat(64)}).toString()},
@@ -47,6 +47,55 @@ test('host queue preserves taps and fails neutral on overflow', () => {
 
 const roomResponse = async () => ({ok:true,json:async()=>({room:'a'.repeat(32),guest:'b'.repeat(64),host:'d'.repeat(64),build:'c'.repeat(64)})});
 const identityResponse = async () => ({ok:true,text:async()=>'<script>window.SUPERTUX_DEPLOY_CONFIG = '+JSON.stringify({manifestSha256:'c'.repeat(64)})+';</script>'});
+
+test('authoritative room warnings are ordered, clear on a later deadline, and never change input', async () => {
+  const f=fixture(true,identityResponse);await new Promise(resolve=>setImmediate(resolve));
+  const socket=f.sockets[0],receive=value=>socket.fire('message',{data:JSON.stringify(value)});
+  await receive({type:'ready'});await receive({type:'session',generation:2,enabled:true});
+  await f.window.fire('keydown',{code:'ArrowRight',preventDefault(){}});
+  const state=f.window.supertuxGuest.state,warning=f.elements.get('guest_lifetime');
+  await receive({type:'lifetime',revision:2,kind:'idle',remainingMs:120000,warning:true});
+  assert.equal(warning.hidden,false);assert.match(warning.textContent,/resume/);
+  assert.equal(f.window.supertuxGuest.state.mask,state.mask);assert.equal(f.window.supertuxGuest.state.enabled,true);
+  await receive({type:'lifetime',revision:3,kind:'session',remainingMs:3000000,warning:false});
+  assert.equal(warning.hidden,true);
+  await receive({type:'lifetime',revision:2,kind:'idle',remainingMs:60000,warning:true});
+  assert.equal(warning.hidden,true,'A retired warning cannot reappear after Resume');
+  await socket.fire('close',{reason:'Room session limit reached'});
+  assert.equal(f.window.supertuxGuest.state.mask,0);assert.equal(f.window.supertuxGuest.state.enabled,false);
+  assert.match(f.elements.get('guest_status').textContent,/Room ended.*fresh invitation/);
+});
+
+test('expiry pauses the joined host, blocks Resume and preserves the save-before-title path', async () => {
+  const f=fixture(false,roomResponse);await f.elements.get('coop_create').fire('click');
+  const socket=f.sockets[0],receive=value=>socket.fire('message',{data:JSON.stringify(value)}),engine=f.window.Module.supertuxCoop;
+  await receive({type:'ready'});await receive({type:'peer',connected:true,view:true});engine.engineStatus(1,true,3,0);
+  await receive({type:'lifetime',revision:4,kind:'session',remainingMs:120000,warning:true});
+  assert.equal(f.elements.get('coop_lifetime').hidden,false);assert.equal(f.window.Module.supertuxShell.active,true);
+  await socket.fire('close',{reason:'Room session limit reached'});
+  assert.equal(f.window.Module.supertuxShell.active,false);assert.equal(engine.state.lost,true);
+  assert.equal(f.elements.get('coop_lifetime').hidden,true);assert.equal(f.elements.get('coop_restart').hidden,false);
+  assert.equal(typeof engine.canResume(),'string');assert.match(f.elements.get('coop_status').textContent,/Return to title to save/);
+  let reloads=0;f.window.location.reload=()=>++reloads;f.window.supertux_saveFiles=async()=>false;
+  await f.elements.get('coop_restart').fire('click');assert.equal(reloads,0);
+  f.window.supertux_saveFiles=async()=>true;
+  await f.elements.get('coop_restart').fire('click');assert.equal(reloads,1);
+});
+
+test('invalid room notices cannot poison or extend a deadline', async () => {
+  for(const patch of [{kind:'legacy'},{revision:0},{remainingMs:Infinity},{remainingMs:3600001},{warning:false},{extra:true}]) {
+    const f=fixture(),connection=new f.window.SupertuxCoop.Connection('room','host','token','build',{});
+    await connection.socket.fire('message',{data:JSON.stringify({type:'lifetime',revision:1,kind:'session',remainingMs:60000,warning:true,...patch})});
+    assert.equal(connection.closed,true);assert.equal(connection.lifetime,null);
+  }
+});
+
+test('an unclaimed expired invitation keeps title-screen hosting available', async () => {
+  const f=fixture(false,roomResponse);await new Promise(resolve=>setImmediate(resolve));
+  await f.elements.get('coop_create').fire('click');await f.sockets[0].fire('close',{reason:'Room invitation expired'});
+  assert.equal(f.window.Module.supertuxShell.active,true);assert.equal(f.elements.get('coop_create').disabled,false);
+  assert.match(f.elements.get('coop_status').textContent,/Tap Host game/);
+});
 
 test('room capability controls entry; a query flag does not advertise an unsupported server', async () => {
   for (const rooms of [true,false]) {

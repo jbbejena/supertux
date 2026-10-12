@@ -72,8 +72,10 @@ startup/music caching remain unchanged.
 
 Safe interruption, neutral generations and save-flush-before-title restart remain
 as described in [PRIVATE_COOP_RECOVERY.md](PRIVATE_COOP_RECOVERY.md). Phase 8D
-completion/lobby polish and invitation versus active-session expiry remain follow-up
-work. The entire current room, including play, still expires after 15 minutes.
+completion/lobby polish remains follow-up work. The
+[room-lifetime update](PRIVATE_COOP_ROOM_LIFETIME.md) separates 15-minute invitations
+from one-hour paired sessions and 10-minute inactive limits, with expiry warnings.
+The published pre-update runtime still uses its original 15-minute entire-room cap.
 Seamless in-level reconnect is not supported.
 
 The Safari touch polish suppresses selection and Apple touch callouts throughout

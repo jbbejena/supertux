@@ -1,7 +1,7 @@
 // Private input/presentation relay. Game simulation stays on the host.
 import {validView} from './view.js';
-export const PROTOCOL = 2;
-export const ROOM_MS = 15 * 60 * 1000;
+import {newLifetime, updateLifetime, lifetimeStatus, expiryReason, WARNING_MS, INVITATION_MS} from './room-lifetime.js';
+export const PROTOCOL = 3;
 const TOKEN = /^[a-f0-9]{64}$/;
 const BUILD = /^[a-f0-9]{64}$/;
 const UINT = value => Number.isInteger(value) && value > 0 && value < 0x80000000;
@@ -47,10 +47,10 @@ export async function coopFetch(request, env) {
     const room = crypto.randomUUID().replaceAll('-', ''), host = secret(), guest = secret();
     const stub = env.COOP_ROOMS.get(env.COOP_ROOMS.idFromName(room));
     const response = await stub.fetch('https://room.internal/create', {
-      method: 'POST', body: JSON.stringify({host, guest, build: value.build, origin: url.origin, expires: Date.now() + ROOM_MS}),
+      method: 'POST', body: JSON.stringify({host, guest, build: value.build, origin: url.origin, ...newLifetime(Date.now())}),
     });
     if (!response.ok) return json({error: 'Room creation failed'}, 503);
-    return json({room, host, guest, protocol: PROTOCOL, build: value.build, expiresIn: ROOM_MS / 1000}, 201);
+    return json({room, host, guest, protocol: PROTOCOL, build: value.build, expiresIn: INVITATION_MS / 1000}, 201);
   }
   const match = /^\/coop\/rooms\/([a-f0-9]{32})\/socket$/.exec(url.pathname);
   if (match && request.method === 'GET' && request.headers.get('Upgrade')?.toLowerCase() === 'websocket')
@@ -66,15 +66,18 @@ export class CoopRoom {
       if (await this.state.storage.get('room')) return json({error: 'Already initialized'}, 409);
       const room = await request.json();
       await this.state.storage.put('room', room);
-      await this.state.storage.setAlarm(Date.now() + ROOM_MS);
+      await this.arm(room);
       return json({created: true});
     }
     const room = await this.state.storage.get('room');
-    if (!room || Date.now() >= room.expires) return json({error: 'Room expired'}, 410);
+    if (!room) return json({error: 'Room expired'}, 410);
+    if (Date.now() >= lifetimeStatus(room, Date.now()).expires) {
+      await this.expire(room); return json({error: 'Room expired'}, 410);
+    }
     if (request.headers.get('Origin') !== room.origin) return json({error: 'Origin rejected'}, 403);
     const protocols = (request.headers.get('Sec-WebSocket-Protocol') || '').split(',').map(x => x.trim());
     const credential = /^(host|guest)\.([a-f0-9]{64})$/.exec(protocols[1] || '');
-    if (protocols.length !== 2 || protocols[0] !== 'supertux-coop-v2' || !credential ||
+    if (protocols.length !== 2 || protocols[0] !== `supertux-coop-v${PROTOCOL}` || !credential ||
         !TOKEN.test(credential[2]) || room[credential[1]] !== credential[2])
       return json({error: 'Credentials rejected'}, 403);
     const role = credential[1];
@@ -84,7 +87,7 @@ export class CoopRoom {
     this.state.acceptWebSocket(server, [role]);
     server.serializeAttachment({role, hello: false, last: Date.now(), opened: Date.now(), rateStart: Date.now(), count: 0, generation: 0, sequence: 0, inFlight: 0});
     await this.arm(room);
-    return new Response(null, {status: 101, webSocket: client, headers: {'Sec-WebSocket-Protocol': 'supertux-coop-v2'}});
+    return new Response(null, {status: 101, webSocket: client, headers: {'Sec-WebSocket-Protocol': `supertux-coop-v${PROTOCOL}`}});
   }
 
   send(socket, value) {
@@ -92,7 +95,7 @@ export class CoopRoom {
     if ((info.inFlight || 0) >= 32) {
       // These are latest-state notifications, never gameplay edges. Keep one
       // value per type while the receiver returns credit, not an event backlog.
-      if (['connection', 'session', 'ack', 'pong', 'view', 'result'].includes(value.type)) {
+      if (['connection', 'session', 'lifetime', 'ack', 'pong', 'view', 'result'].includes(value.type)) {
         info.pending ||= {};
         if (value.type === 'view') {
           // Cloudflare limits WebSocket attachments to 2 KiB. Large complete
@@ -112,7 +115,7 @@ export class CoopRoom {
     catch { try { socket.close(1011, 'Relay send failed'); } catch {} return false; }
   }
   flush_status(socket) {
-    for (const type of ['connection', 'session', 'ack', 'pong', 'view', 'result']) {
+    for (const type of ['connection', 'session', 'lifetime', 'ack', 'pong', 'view', 'result']) {
       const info = socket.deserializeAttachment();
       if ((info.inFlight || 0) >= 32) break;
       const marker = info.pending?.[type];
@@ -126,6 +129,31 @@ export class CoopRoom {
   }
   peer(role) { return this.state.getWebSockets(role)[0]; }
   close(socket, code, reason) { this.pendingViews.delete(socket); try { socket.close(code, reason); } catch {} }
+
+  async syncLifetime(room) {
+    if (room.lifetimePolicy !== 1) return;
+    const host = this.peer('host')?.deserializeAttachment(), guest = this.peer('guest')?.deserializeAttachment();
+    let changed = updateLifetime(room, !!(host?.hello && guest?.hello), host?.session?.enabled === true, Date.now());
+    const status = lifetimeStatus(room, Date.now()), key = `${status.kind}/${status.expires}/${status.warning}`;
+    if (room.lifetimeKey !== key) {
+      room.lifetimeKey = key; ++room.lifetimeRevision; changed = true;
+    }
+    if (changed) await this.state.storage.put('room', room);
+    for (const socket of this.state.getWebSockets()) {
+      const info = socket.deserializeAttachment();
+      if (!info.hello || info.lifetimeRevision === room.lifetimeRevision) continue;
+      info.lifetimeRevision = room.lifetimeRevision; socket.serializeAttachment(info);
+      this.send(socket, {type:'lifetime', revision:room.lifetimeRevision,
+        kind:status.kind, remainingMs:status.remainingMs, warning:status.warning});
+    }
+  }
+
+  async expire(room) {
+    const reason = expiryReason(lifetimeStatus(room, Date.now()).kind);
+    for (const socket of this.state.getWebSockets()) this.close(socket, 1008, reason);
+    await this.state.storage.deleteAll();
+    await this.state.storage.deleteAlarm();
+  }
 
   async interrupt(room) {
     if (room.interruption) return;
@@ -152,7 +180,8 @@ export class CoopRoom {
   async webSocketMessage(socket, raw) {
     const room = await this.state.storage.get('room');
     const info = socket.deserializeAttachment();
-    if (!room || Date.now() >= room.expires) { this.close(socket, 1008, 'Room expired'); return; }
+    if (!room) { this.close(socket, 1008, 'Room expired'); return; }
+    if (Date.now() >= lifetimeStatus(room, Date.now()).expires) { await this.expire(room); return; }
     if (typeof raw !== 'string' || new TextEncoder().encode(raw).length > 65536) { this.close(socket, 1009, 'Message too large'); return; }
     const now = Date.now();
     for (const peer of this.state.getWebSockets()) {
@@ -252,6 +281,7 @@ export class CoopRoom {
         if (session) this.send(this.peer('guest'), session);
       }
     }
+    await this.syncLifetime(room);
     await this.arm(room);
   }
 
@@ -261,6 +291,8 @@ export class CoopRoom {
     if (role === 'guest') {
       const host = this.peer('host');
       if (host) this.send(host, {type: 'peer', connected: false});
+      const room = await this.state.storage.get('room');
+      if (room) {await this.syncLifetime(room); await this.arm(room);}
     } else {
       for (const peer of this.state.getWebSockets()) this.close(peer, 1012, 'Host left; create a new room');
       await this.state.storage.deleteAll();
@@ -270,7 +302,9 @@ export class CoopRoom {
   async webSocketError(socket) { await this.webSocketClose(socket, 1011, 'Connection error'); }
 
   async arm(room) {
-    let next = room.expires;
+    const now = Date.now(), status = lifetimeStatus(room, now);
+    let next = status.expires;
+    if (room.lifetimePolicy === 1 && !status.warning) next = Math.min(next, status.expires - WARNING_MS);
     for (const socket of this.state.getWebSockets()) {
       const info = socket.deserializeAttachment();
       next = Math.min(next, info.hello ? info.last + (room.interruption ? RECOVERY_MS : idleLimit(info)) : info.opened + 5000);
@@ -281,10 +315,8 @@ export class CoopRoom {
   async alarm() {
     const room = await this.state.storage.get('room');
     if (!room) return;
-    if (Date.now() >= room.expires) {
-      for (const socket of this.state.getWebSockets()) this.close(socket, 1008, 'Room expired');
-      await this.state.storage.deleteAll(); return;
-    }
+    if (Date.now() >= lifetimeStatus(room, Date.now()).expires) { await this.expire(room); return; }
+    await this.syncLifetime(room);
     for (const socket of this.state.getWebSockets()) {
       const info = socket.deserializeAttachment();
       if ((!info.hello && Date.now() - info.opened >= 5000) || (info.hello && Date.now() - info.last >= RECOVERY_MS) ||

@@ -35,8 +35,9 @@ private-room binding; this PR does not enable multiplayer production delivery.
    All-player death restarts at the activated checkpoint, when applicable.
 6. Completion releases guest controls and reports the outcome. To change rooms
    or recover a disconnect, host returns to the title screen before rejoining.
-   The entire room currently has a 15-minute lifetime, including active play.
-   Phase 8's lifecycle work will address that limitation.
+   The published pre-update runtime has a 15-minute entire-room lifetime.
+   The [room-lifetime candidate](PRIVATE_COOP_ROOM_LIFETIME.md) separates
+   15-minute invitations, one-hour paired sessions and 10-minute inactive periods.
 
 ## Architecture and content inventory
 

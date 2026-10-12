@@ -5,6 +5,8 @@ This document records the original static-arena milestone. The subsequent
 Welcome to Antarctica campaign level and its native object/drawing baselines.
 Use [PRIVATE_COOP_HOST_JOIN.md](PRIVATE_COOP_HOST_JOIN.md) for current phone
 entry; the instructions below describe the original diagnostic milestone.
+The [room-lifetime candidate](PRIVATE_COOP_ROOM_LIFETIME.md) updates the protocol
+and deadline policy after this original protocol-2 implementation.
 
 Based on merged input-proof PR #11, browser integration commit
 `f7c436e3bcb12363c5f193bd50b28f4d2ee691f7`. The implementation branch is

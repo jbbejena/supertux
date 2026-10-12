@@ -3,6 +3,11 @@
 Plan updated: 2026-10-12 UTC. This is a follow-on implementation plan, not a
 claim that replay or longer rooms are available.
 
+The user subsequently requested room lifetime first, then the failing CI check.
+[PRIVATE_COOP_ROOM_LIFETIME.md](PRIVATE_COOP_ROOM_LIFETIME.md) records that
+implementation on PR #19; the replay/lobby section below remains planned work.
+Existing private staging remains on the previous runtime until tested publication.
+
 ## Starting point
 
 Phase 8C is merged through [PR #18](https://github.com/jbbejena/supertux/pull/18)

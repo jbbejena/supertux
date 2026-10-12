@@ -42,7 +42,7 @@ class PackagingTests(unittest.TestCase):
             verify(preview,sha)
             capability=preview/'coop/capabilities.json'
             fallback=capability.read_bytes()
-            self.assertEqual(json.loads(fallback),{'rooms':False,'protocol':2})
+            self.assertEqual(json.loads(fallback),{'rooms':False,'protocol':3})
             capability.unlink()
             with self.assertRaises(AssertionError): verify(preview,sha)
             capability.parent.mkdir(parents=True,exist_ok=True)

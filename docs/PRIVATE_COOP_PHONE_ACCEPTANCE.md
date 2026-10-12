@@ -166,7 +166,10 @@ real spawn position remain asserted. A failed reset captures a screenshot.
 Use the host HTTPS URL from the successful run summary, including `?coop=1`.
 Staging is a separate origin, with its own browser saves/settings and asset
 cache. Production saves are not imported. The entire room currently expires after
-15 minutes, including active play; create a new room for a longer testing session.
+15 minutes, including active play, on the published pre-update runtime. The
+[room-lifetime candidate](PRIVATE_COOP_ROOM_LIFETIME.md) gives new paired rooms a
+one-hour absolute cap and a 10-minute inactive cap, with two-minute warnings.
+Test the exact published runtime before assuming that candidate is available.
 
 1. Phone A: use Start, expand **Private co-op**, then **Host game** (**Create room**
    on the older recovery runtime). The main game Worker must not advertise rooms.

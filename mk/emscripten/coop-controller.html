@@ -16,12 +16,13 @@
   <h1>Player 2 diagnostic controller</h1>
   <p>This is a remote-input proof. Watch and play the game on the host screen. This page does not show or simulate the world.</p>
   <p id="guest_status" role="status">Waiting for a private room link.</p>
+  <p id="guest_lifetime" hidden role="alert"></p>
   <div class="controls">
     <div class="pad"><button class="up" data-control="4" aria-label="Up">↑</button><button class="left" data-control="1" aria-label="Left">←</button><button class="down" data-control="8" aria-label="Down">↓</button><button class="right" data-control="2" aria-label="Right">→</button></div>
     <div><button data-control="16">Jump</button><button data-control="32">Action</button><button data-control="64">Item</button></div>
   </div>
   <p>Keyboard: arrows or WASD, Space/J to jump, Ctrl/K for action, Shift for item. The host controls menus and progress.</p>
   <p id="guest_ack"></p><button id="guest_join">Rejoin</button>
-  <p>After a lost connection, return the host to its title screen, rejoin, then start the level again. Rooms expire after 15 minutes. Keep the controller link private.</p>
+  <p>After a lost connection, return the host to its title screen, rejoin, then start the level again. Invitations last 15 minutes. Connected rooms last up to an hour; waiting or paused rooms close after 10 minutes. Keep the controller link private.</p>
   <script src="coop.js"></script>
 </body></html>
