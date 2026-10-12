@@ -79,6 +79,13 @@ browser fixtures; they verify touch-target layout, trusted Resume, neutral input
 and durable save retry without a one-hour sleep or a public test-only route.
 Fake-clock server enforcement and browser fixtures are distinct evidence.
 
+On the baseline plus room-lifetime working tree, all 10 lobby checks pass in
+Chromium 151 and Linux WebKit 26.5, with no page/console errors. All 108 JavaScript
+and 23 Python focused checks pass. The subsequent
+[CI recovery correction](PRIVATE_COOP_CI_RECOVERY.md) retains the full remote-input
+coverage and adds a deterministic delayed-generation regression. Final exact-source
+Release/Debug results belong to the candidate's Actions runs.
+
 Use the complete pinned Release/Debug artifact and exact successful non-PR
 validation procedure in [PRIVATE_COOP_PHONE_ACCEPTANCE.md](PRIVATE_COOP_PHONE_ACCEPTANCE.md).
 Both frontend protocol and Worker must publish together. No production deployment
