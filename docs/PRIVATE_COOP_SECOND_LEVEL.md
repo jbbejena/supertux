@@ -88,6 +88,9 @@ file after a real reload; an initial unsolved file is not completion evidence.
 Host-only placement/ghost fixtures are labelled; they do not establish
 unassisted completion on a phone. Global sprite artwork animation may continue
 while the loading gate holds physics; positions/input must remain frozen.
+Before the first fixture key edge, a displayed baseline also needs the current
+neutral native input handshake. The eleven-check lobby suite covers a controlled
+startup stall; see [PRIVATE_COOP_CI_RECOVERY.md](PRIVATE_COOP_CI_RECOVERY.md).
 
 Existing first-level, boot/audio/cache, touch, local/remote input and lobby,
 lifetime/save suites remain. CI adds the second-level suite to Release Chromium

@@ -52,3 +52,36 @@ browser job fails; no check is removed or converted into a warning.
 This complements the separately retained WebKit geometry observation correction
 and the [room lifetime implementation](PRIVATE_COOP_ROOM_LIFETIME.md). Local
 Chromium/Linux WebKit evidence does not establish physical-phone acceptance.
+
+
+## Initial lobby input after a painted baseline
+
+On the second-level candidate `77ffcad5f09bcd0351ce6f4f2248fcca0c271289`,
+[validation 38347771049](https://github.com/jbbejena/supertux/actions/runs/38347771049)
+passes Release (both campaign levels in Chromium/WebKit), Linux and lint. Debug
+passes its existing local/remote and shared-view suites, then fails the lobby's
+first Right movement assertion. The old report records picture readiness and
+the active-room notice, but no input-owner state; the exact historical packet
+and frame ordering cannot be reconstructed.
+
+A painted native baseline is sent before the host compositor completes that
+frame. A startup stall can legitimately retire a press under the existing
+750 ms input safety rule. The lobby and second-level drivers now observe the
+same displayed/native generation, neutral guest input and two successive native
+receipts before their next ordinary key edge. The second receipt observes a
+completed host frame. Resets restart this observation with neutral input and
+never replay a retired press. No timeout, watchdog or movement assertion is
+relaxed.
+
+The lobby adds a controlled 1.1-second host stall after initial readiness. A
+console event signals entry before the guest presses Right; it confirms the
+fixture is still running, sees the old held press become neutral after a
+generation reset, then waits for the fresh handshake and verifies ordinary
+movement/Jump. This reproduces the unsafe startup ordering deterministically
+without proving the historical runner's exact schedule. All original ten
+lobby checks remain, plus this eleventh check. Chromium Debug and Linux WebKit
+pass on the compiled `77ffcad5f0` runtime with the revised driver.
+
+Future lobby failures archive both owners, the latest guest baseline and console
+output. Required validation correctly fails on the original Debug failure.
+Final committed-source CI remains the review gate, recorded in PR #20.

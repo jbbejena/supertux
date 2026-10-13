@@ -115,6 +115,7 @@ async def run(args, url):
 
             initial = await sample('initial',"SupertuxView.state.drawn.scene==='journey-v1'")
             assert {'smartblock','spiky','sspiky','firefly','snowball'} <= {e[1] for e in initial['world']['entities']}
+            await coop_smoke.ready_for_view_input(host,guest)
             x = initial['players'][1]['x']
             await guest.keyboard.down('ArrowRight')
             await sample('independent-move',f'SupertuxView.state.drawn.players[1].x>{x+32}')

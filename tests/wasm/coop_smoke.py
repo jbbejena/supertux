@@ -22,6 +22,35 @@ from playwright.async_api import async_playwright
 from browser_smoke import Handler, KNOWN_UPSTREAM_UB
 from touch_smoke import Fingers, controls
 
+
+async def ready_for_view_input(host, guest, timeout=15000):
+    """Observe current displayed generation and two native neutral receipts.
+
+    A painted baseline precedes host compositor completion. Initial frames can
+    still retire input, so picture readiness alone cannot authorize a fixture's
+    next key edge. Never replay the edge after a generation reset.
+    """
+    deadline = time.monotonic()+timeout/1000
+    while time.monotonic()<deadline:
+        state = await host.evaluate('Module.supertuxCoop.state')
+        if state['enabled'] and state['sequence']>0:
+            current = await guest.evaluate('({input:supertuxGuest.state,view:{playable:SupertuxView.playable,generation:SupertuxView.state.drawn?.generation}})')
+            if (current['input']['connected'] and current['input']['enabled'] and current['input']['mask']==0 and
+                    current['input']['generation']==state['generation'] and current['view']['playable'] and
+                    current['view'].get('generation')==state['generation']):
+                # A later native receipt also observes completion of the frame
+                # that accepted the first one. A startup reset restarts this
+                # observation with fresh neutral input, rather than a held key.
+                await host.wait_for_function('([generation,sequence])=>Module.supertuxCoop.state.generation!==generation || Module.supertuxCoop.state.sequence>sequence',
+                                             arg=[state['generation'],state['sequence']],timeout=max(1,int((deadline-time.monotonic())*1000)))
+                latest = await host.evaluate('Module.supertuxCoop.state')
+                if latest['enabled'] and latest['generation']==state['generation'] and latest['sequence']>state['sequence']:
+                    check = await guest.evaluate('({input:supertuxGuest.state,view:{playable:SupertuxView.playable,generation:SupertuxView.state.drawn?.generation}})')
+                    if check['input']['generation']==latest['generation'] and check['input']['mask']==0 and check['view']['playable'] and check['view'].get('generation')==latest['generation']:
+                        return latest['generation']
+        await asyncio.sleep(.04)
+    raise AssertionError('Current shared-view generation never accepted fresh neutral input')
+
 PAD_SCRIPT = '''window.pads=[0,1].map(index=>({index,id:'Xbox 360 Controller',mapping:'standard',connected:true,timestamp:1,axes:[0,0,0,0],buttons:Array.from({length:17},()=>({pressed:false,touched:false,value:0}))}));navigator.getGamepads=()=>pads.map(p=>p.connected?p:null);window.pad=(i,j,v)=>{pads[i].buttons[j]={pressed:!!v,touched:!!v,value:v};pads[i].timestamp=performance.now();};void 0;'''
 
 
