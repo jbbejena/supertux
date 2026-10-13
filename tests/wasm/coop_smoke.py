@@ -391,10 +391,28 @@ async def run(args, url):
             await sample('gamepad-live-rejoin',lambda s:s[1]['y']<800)
             report['checks'].append('Actual SDL browser gamepad removal and live rejoin recreate a real P2 and preserve P1')
 
-        # Touch the packaged checkpoint bell via a host fixture, then exercise
-        # the ordinary all-dead restart path. No campaign assets/rules change.
-        await script('sector.Tux.set_pos(5360,512);sector.Tux2.set_pos(5360,512);')
-        await sample('checkpoint-bell',lambda s:all(v['x']>5300 and v['y']<800 for v in s))
+        if guest:
+            # Only Player 1 is placed at the fresh bell. Player 2 starts dying
+            # in the same paused fixture, before its normal target exists.
+            # Native contact must revive it without any Action input.
+            await script('sector.Tux2.kill(true);sector.Tux.set_pos(5360,512);')
+            await sample('checkpoint-bell',lambda s:all(v['x']>5300 and v['y']<800 for v in s))
+            await script('coopReviveWait <- newthread(function(){wait(3.4,true);print("COOP_REVIVE_READY");});coopReviveWait.call();')
+            await host.wait_for_function("document.querySelector('#output').textContent.includes('[SCRIPTING] COOP_REVIVE_READY')",timeout=30000)
+            await guest_active(neutral=True)
+            await p2('right',True)
+            await sample('checkpoint-revived-control',lambda s:s[1]['right'] and not s[0]['right'] and s[1]['y']<800)
+            await p2('right',False)
+            report['checks'].append('A fresh checkpoint revives Player 2 during its death animation without Action; controls still work after the former death timer expires')
+        else:
+            await script('sector.Tux.set_pos(5360,512);sector.Tux2.set_pos(5296,512);')
+            await sample('checkpoint-bell',lambda s:abs(s[0]['x']-5360)<5 and abs(s[1]['x']-5296)<5 and all(v['y']<800 for v in s))
+            report['checks'].append('A fresh checkpoint leaves a living local teammate at its independent position')
+
+        # Touching the already active bell with both players alive must leave
+        # the other player at its independent position.
+        await script('sector.Tux.set_pos(5360,512);sector.Tux2.set_pos(5296,512);')
+        await sample('used-checkpoint-living-position',lambda s:abs(s[0]['x']-5360)<5 and abs(s[1]['x']-5296)<5)
         await host.wait_for_timeout(600)
         old = await host.evaluate('Module.supertuxCoop.state.generation') if guest else 0
         await script('sector.Tux.kill(true);sector.Tux2.kill(true);coopRestartWait <- newthread(function(){wait(3.4,true);print("COOP_RESTART_READY");});coopRestartWait.call();')

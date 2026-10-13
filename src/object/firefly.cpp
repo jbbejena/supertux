@@ -104,7 +104,7 @@ Firefly::collision(MovingObject& other, const CollisionHit& )
     return ABORT_MOVE;
 
   auto player = dynamic_cast<Player*> (&other);
-  if (player) {
+  if (player && player->is_active()) {
     activated = true;
     // Spawn some particles.
     // TODO: provide convenience function in MovingSprite or MovingObject?
@@ -132,6 +132,8 @@ Firefly::collision(MovingObject& other, const CollisionHit& )
     set_action("ringing");
     GameSession::current()->set_checkpoint_pos(Sector::get().get_name(),
                                                initial_position);
+    for (auto* teammate : Sector::get().get_players())
+      teammate->respawn_at_checkpoint(*player);
   }
 
   return ABORT_MOVE;

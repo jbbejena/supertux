@@ -3117,6 +3117,17 @@ Player::multiplayer_prepare_spawn()
 }
 
 void
+Player::respawn_at_checkpoint(const Player& activator)
+{
+  if (is_alive() || !activator.is_active() || this == &activator)
+    return;
+
+  // A checkpoint can be reached before the death animation has finished,
+  // when the usual Action respawn target has not been selected yet.
+  multiplayer_respawn(activator.get_pos());
+}
+
+void
 Player::multiplayer_respawn()
 {
   if (!m_target)
@@ -3133,6 +3144,13 @@ Player::multiplayer_respawn()
     return;
   }
 
+  multiplayer_respawn(target->get_pos());
+}
+
+void
+Player::multiplayer_respawn(const Vector& pos)
+{
+  m_dying_timer.stop();
   m_dying = false;
   m_dead = false;
   m_deactivated = false;
@@ -3140,7 +3158,7 @@ Player::multiplayer_respawn()
   set_group(COLGROUP_MOVING);
   m_physic.reset();
 
-  set_pos_reset(target->get_pos());
+  set_pos_reset(pos);
   m_target.reset();
 }
 

@@ -174,8 +174,33 @@ async def run(args, url):
             await sample('secret-fade',"!SupertuxView.state.drawn.world.draw.some(c=>c[0]===0 && c[2]===110 && c[4]>.01)")
             report['checks'].append('Native secret-area trigger fades its actual cover tilemap in the guest complete baseline')
 
-            await script('sector.Tux.set_pos(6384,512);sector.Tux2.set_pos(6448,512);')
-            checkpoint = await sample('checkpoint',"SupertuxView.state.drawn.world.checkpoint?.[0]===6448")
+            # Kill Player 2 before touching the untouched bell. Only Player 1
+            # activates it; no guest Action or fixture revival is sent.
+            await script('sector.Tux.set_pos(6384,512);sector.Tux2.kill(true);')
+            await sample('dead-before-checkpoint',"SupertuxView.state.drawn.players[0].dead===0 && SupertuxView.state.drawn.players[1].dead===2 && SupertuxView.state.drawn.world.checkpoint===null")
+            await script('sector.Tux.set_pos(6448,512);')
+            checkpoint = await sample('checkpoint',"SupertuxView.state.drawn.world.checkpoint?.[0]===6448 && SupertuxView.state.drawn.players.every(p=>p.dead===0) && Math.abs(SupertuxView.state.drawn.players[1].x-SupertuxView.state.drawn.players[0].x)<5")
+            assert await host.evaluate('levelPacket.players.every(p=>p.dead===0)')
+            await coop_smoke.ready_for_view_input(host,guest)
+            revived_x = checkpoint['players'][1]['x']
+            await guest.keyboard.down('ArrowRight')
+            await sample('checkpoint-revived-move',f'SupertuxView.state.drawn.players[1].x>{revived_x+32}')
+            await guest.keyboard.up('ArrowRight')
+            report['checks'].append('Player 1 activates a fresh native bell and revives dead Player 2 on both screens without Action; ordinary guest input controls the revived player')
+
+            # Standing at an already ringing bell cannot repeatedly revive a
+            # teammate. The existing ordinary Action respawn still works.
+            await script('sector.Tux2.kill(true);')
+            await sample('dead-at-used-checkpoint',"SupertuxView.state.drawn.players[0].dead===0 && SupertuxView.state.drawn.players[1].dead===2 && SupertuxView.state.drawn.world.checkpoint?.[0]===6448")
+            await script('sector.Tux.set_pos(6448,512);')
+            await sample('used-checkpoint-no-revival',"SupertuxView.state.drawn.players[1].dead===2")
+            await coop_smoke.ready_for_view_input(host,guest)
+            await guest.keyboard.down('KeyK')
+            await sample('used-checkpoint-action-respawn',"SupertuxView.state.drawn.players.every(p=>p.dead===0) && Math.abs(SupertuxView.state.drawn.players[1].x-SupertuxView.state.drawn.players[0].x)<5")
+            await guest.keyboard.up('KeyK')
+            report['checks'].append('An already activated checkpoint does not repeatedly revive a fallen teammate; ordinary Action respawn remains available')
+
+            checkpoint = await sample('checkpoint-before-restart')
             epoch = checkpoint['epoch']
             await script('sector.Tux.kill(true);sector.Tux2.kill(true);')
             await sample('checkpoint-restart',f'SupertuxView.state.drawn.epoch>{epoch} && SupertuxView.state.drawn.players.every(p=>p.dead===0 && Math.abs(p.x-6448)<5)',timeout=45000)
