@@ -23,6 +23,8 @@ panel, choose **Close room**, then **Return to title**. The host flushes saves
 before reloading; failed saving keeps the page open for retry. Select the next
 level and share a fresh invitation. Finite room limits and neutral-input,
 trusted-Resume recovery continue to apply.
+The selector uses the existing native levelset completion records; synchronized
+world-map navigation and automatic campaign advancement remain out of scope.
 
 ## Supported content
 
@@ -81,6 +83,8 @@ delayed-baseline gating, remote movement/touch Jump, shared camera, level artwor
 survey, sleeping-spiky wake and smart-block stomp, coin removal, secret fade,
 checkpoint/death restart, pause/neutral
 Resume, viewport changes, original native completion and hydrated host saves.
+The save check waits for this level's actual `solved` flag before comparing the
+file after a real reload; an initial unsolved file is not completion evidence.
 Host-only placement/ghost fixtures are labelled; they do not establish
 unassisted completion on a phone. Global sprite artwork animation may continue
 while the loading gate holds physics; positions/input must remain frozen.

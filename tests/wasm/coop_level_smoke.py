@@ -6,10 +6,15 @@ This checks compiled gameplay/presentation, not unassisted phone completion.
 import asyncio
 import json
 import re
+import sys
+import time
+from pathlib import Path
 from urllib.request import Request, urlopen
 from playwright.async_api import async_playwright
 from browser_smoke import KNOWN_UPSTREAM_UB
 import coop_smoke
+sys.path.insert(0,str(Path(__file__).parents[2]/'tools/web'))
+from coop_presentation import sexp
 
 
 async def run(args, url):
@@ -204,9 +209,18 @@ async def run(args, url):
             assert not await guest.evaluate('SupertuxView.playable')
             assert await guest.evaluate('supertuxGuest.state.mask') == 0
             assert await guest.evaluate('indexedDB.databases().then(d=>d.length)') == 0
-            await host.wait_for_function("Module.FS.readdir(Module.supertuxStorage.root+'profile1').includes('world1.stsg')")
-            saved = await host.evaluate("Module.FS.readFile(Module.supertuxStorage.root+'profile1/world1.stsg',{encoding:'utf8'})")
-            assert 'journey_begins.stl' in saved
+            def earned(node):
+                return isinstance(node,list) and ((node and node[0]=='journey_begins.stl' and ['solved','#t'] in node[1:]) or any(earned(child) for child in node))
+            # Result delivery precedes LevelsetScreen's native save on its next
+            # setup. An initial unsolved file already exists: wait for this
+            # level's earned flag, not merely the filename or a completed flush.
+            deadline = time.monotonic()+15
+            while True:
+                saved = await host.evaluate("Module.FS.readFile(Module.supertuxStorage.root+'profile1/world1.stsg',{encoding:'utf8'})")
+                if earned(sexp(saved)): break
+                assert time.monotonic()<deadline,'Native completion did not save the second level as solved'
+                await host.wait_for_timeout(100)
+            report['earned_level_solved'] = True
             report['checks'].append('Original native end sequence completes the second level; guest releases controls and host owns earned campaign progression')
             report['snapshot_bytes_max'] = await guest.evaluate('levelBytes')
             assert report['snapshot_bytes_max'] <= 65536
