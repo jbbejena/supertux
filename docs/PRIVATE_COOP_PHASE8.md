@@ -269,10 +269,12 @@ the prototype at a safe simulation boundary. Resume starts a fresh neutral
 generation and preserves trusted Safari audio activation. Recovery can remain
 title screen → fresh/rejoined room → restart; seamless mid-level reconnect is
 deferred. Completion offers Replay/Return to lobby with a new acknowledged epoch.
-The current **entire room expires after 15 minutes**, including active play.
-Separate the invitation window from bounded active-session/idle limits, chosen
-from measured level duration. Warn before a hard expiry, pause safely and offer
-a fresh-room path. Heartbeats must not create an indefinite room lifetime.
+The published pre-update room expires after 15 minutes, including active play.
+The [room-lifetime implementation](PRIVATE_COOP_ROOM_LIFETIME.md), requested before
+replay/lobby, separates 15-minute invitations, one-hour paired sessions and
+10-minute inactive limits. It warns before expiry and preserves safe pause/save
+recovery. These initial product budgets are not measured level-duration limits;
+heartbeats cannot extend them. Replay/lobby remains planned work.
 
 For 8E, use real iPhone Safari and Android Chrome, swap roles, and test Wi-Fi
 versus cellular. Complete the level without placement/bonus fixtures. Verify

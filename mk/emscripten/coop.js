@@ -1,7 +1,7 @@
 /* Private host-authoritative input and opt-in presentation transport. */
 (function () {
   'use strict';
-  const protocol = 2, limit = 32, buttons = {ArrowLeft: 1, KeyA: 1, ArrowRight: 2, KeyD: 2,
+  const protocol = 3, limit = 32, buttons = {ArrowLeft: 1, KeyA: 1, ArrowRight: 2, KeyD: 2,
     ArrowUp: 4, KeyW: 4, ArrowDown: 8, KeyS: 8, Space: 16, KeyJ: 16, ControlLeft: 32, KeyK: 32, ShiftLeft: 64};
   const validInvitation = params => /^[a-f0-9]{32}$/.test(params.get('room') || '') &&
     ['token','build'].every(key => /^[a-f0-9]{64}$/.test(params.get(key) || '')) &&
@@ -15,13 +15,26 @@
     return url.href;
   }
 
+  const expired = reason => ['Room expired','Room invitation expired','Room idle limit reached','Room session limit reached'].includes(reason);
+  function showLifetime(id, notice) {
+    const node = document.getElementById(id);
+    if (!node) return;
+    node.hidden = !notice?.warning;
+    node.textContent = notice?.warning ? {
+      invitation:'Invitation ends soon. Share it now or host a new room.',
+      idle:'Room closes soon. Start or resume play, or return to title to save.',
+      session:'Room ends soon. Finish up, then ask the host to return to title and save.',
+    }[notice.kind] : '';
+  }
+
   class Connection {
     constructor(room, role, token, build, events) {
       this.maxBuffered = role === 'host' ? 131072 : 16384;
       this.events = events; this.ready = false; this.last = Date.now(); this.closed = false;
+      this.lifetime = null;
       const url = new URL(`/coop/rooms/${room}/socket`, location.href);
       url.protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-      this.socket = new WebSocket(url, ['supertux-coop-v2', `${role}.${token}`]);
+      this.socket = new WebSocket(url, [`supertux-coop-v${protocol}`, `${role}.${token}`]);
       this.socket.addEventListener('open', () => {if (!this.closed) this.send({type: 'hello', protocol, build, ...(events.view ? {view:true} : {})});});
       this.socket.addEventListener('message', event => {
         if (this.closed) return; // buffered events from a retired room own no input
@@ -31,6 +44,16 @@
         if (!value || typeof value !== 'object' || Array.isArray(value)) {this.close('Invalid relay message'); return;}
         this.last = Date.now();
         this.send({type: 'seen'});
+        if (value.type === 'lifetime') {
+          if (Object.keys(value).some(key => !['type','revision','kind','remainingMs','warning'].includes(key)) ||
+              !Number.isInteger(value.revision) || value.revision <= 0 || value.revision >= 0x80000000 ||
+              !['invitation','idle','session'].includes(value.kind) || !Number.isInteger(value.remainingMs) ||
+              value.remainingMs < 0 || value.remainingMs > 3600000 || typeof value.warning !== 'boolean' ||
+              value.warning !== (value.remainingMs <= 120000)) {this.close('Invalid room deadline'); return;}
+          if (this.lifetime && value.revision <= this.lifetime.revision) return;
+          this.lifetime = value;
+          events.lifetime?.(value);
+        }
         if (value.type === 'ready') { this.ready = true; events.ready?.(); }
         events.message?.(value);
       });
@@ -50,6 +73,7 @@
     finish(reason) {
       if (this.closed) return;
       this.closed = true; this.ready = false; clearInterval(this.timer); this.events.closed?.(reason);
+      this.lifetime = null; this.events.lifetime?.(null);
       try { this.socket.close(1000, 'Input proof stopped'); } catch {}
     }
     close(reason = 'Room closed') { this.finish(reason); }
@@ -218,6 +242,7 @@
         if (viewLink) {viewLink.href = invitation; viewLink.textContent = 'Open Player 2 invitation';}
         if (element('coop_invitation')) element('coop_invitation').value = invitation;
         connection = new Connection(room.room, 'host', room.host, build, {
+          lifetime: notice => showLifetime('coop_lifetime', notice),
           ready: () => { say('Room ready. Share the invitation with Player 2.'); session(); render(); },
           message: value => {
             if (value.type === 'connection' && value.interrupted === true) {relayInterrupted = true; interrupt('Connection interrupted. Controls are released. Wait for recovery, then press Resume.');}
@@ -237,7 +262,10 @@
             }
           },
           refresh: session,
-          closed: reason => { interrupt('Connection lost. Return to the title screen and create a new room.', true); guestView = false; starting = false; clearInvitation(); enqueue([3, 0, 0, 0]); say(reason); },
+          closed: reason => {
+            const message = expired(reason) ? (state.reserved === 1 ? 'Room ended. Return to title to save and create a new invitation.' : 'Invitation expired. Tap Host game for a fresh invitation.') : reason;
+            interrupt(message, true); guestView = false; starting = false; clearInvitation(); enqueue([3, 0, 0, 0]); say(message);
+          },
         });
       } catch (error) { if (epoch === createEpoch) say(error.message); }
       finally {
@@ -363,6 +391,7 @@
       if (retry) retry.disabled = true;
       status.textContent = 'Artwork ready. Connecting to the host…';
       connection = new Connection(params.get('room'), 'guest', params.get('token'), params.get('build'), {
+        lifetime: notice => showLifetime('guest_lifetime', notice),
         view: !!view,
         ready: () => { joining = false; if (retry) {retry.disabled = false; retry.hidden = true;} status.textContent = 'Player 2 ready. Waiting for the host to press Start together.'; },
         message: value => {
@@ -381,7 +410,7 @@
           if (value.type === 'ack') document.getElementById('guest_ack').textContent = `Host accepted input ${value.sequence}.`;
         },
         refresh: send,
-        closed: reason => { joining = false; if (retry) {retry.disabled = false; retry.hidden = false;} enabled = false; clear(); view?.reset(); status.textContent = reason + ' Ask the host for a fresh invitation if Retry joining does not work.'; },
+        closed: reason => { joining = false; if (retry) {retry.disabled = false; retry.hidden = false;} enabled = false; clear(); view?.reset(); status.textContent = expired(reason) ? 'Room ended. Ask the host for a fresh invitation.' : reason + ' Ask the host for a fresh invitation if Retry joining does not work.'; },
       });
     };
     window.addEventListener('keydown', event => {

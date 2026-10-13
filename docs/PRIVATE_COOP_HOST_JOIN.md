@@ -1,5 +1,10 @@
 # Phase 8C: phone Host/Join
 
+Host/Join is merged through [PR #18](https://github.com/jbbejena/supertux/pull/18)
+at `a1b238334fdfdc8bc2fe8f731d2cf9b327808d1b`. The current private publication
+and phone checklist are in [PRIVATE_COOP_PHONE_ACCEPTANCE.md](PRIVATE_COOP_PHONE_ACCEPTANCE.md).
+The next implementation is [Phase 8D replay/lobby and room lifetime](PRIVATE_COOP_PHASE8D_PLAN.md).
+
 This follows recovery PR #17, merged into `mobile-web-audit` at
 `e7fe8aa180e5dcbe900cd14c833464256ba5f323`. Private staging refresh
 [38105080282](https://github.com/jbbejena/supertux/actions/runs/38105080282)
@@ -67,9 +72,20 @@ startup/music caching remain unchanged.
 
 Safe interruption, neutral generations and save-flush-before-title restart remain
 as described in [PRIVATE_COOP_RECOVERY.md](PRIVATE_COOP_RECOVERY.md). Phase 8D
-completion/lobby polish and invitation versus active-session expiry remain follow-up
-work. The entire current room, including play, still expires after 15 minutes.
+completion/lobby polish remains follow-up work. The
+[room-lifetime update](PRIVATE_COOP_ROOM_LIFETIME.md) separates 15-minute invitations
+from one-hour paired sessions and 10-minute inactive limits, with expiry warnings.
+The published pre-update runtime still uses its original 15-minute entire-room cap.
 Seamless in-level reconnect is not supported.
+
+The Safari touch polish suppresses selection and Apple touch callouts throughout
+the host play area and Player 2 play surface, including nearby status labels.
+The host invitation panel explicitly restores ordinary text selection/callouts
+for manual copy and Join-field paste. The diagnostic controller uses the same
+control protection. Pointer capture/release, browser activation and help scrolling
+remain unchanged. Automated held/dragged Jump, repeated touch taps and invitation
+selection checks supplement the existing suite; an actual iPhone must still
+confirm the OS Copy/Paste popup is gone.
 
 ## Build, preview and validation
 

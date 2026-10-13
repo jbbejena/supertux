@@ -230,11 +230,13 @@ membership; it makes no new startup-byte reduction claim.
 | Host without an active input session | Up to 15 seconds of startup/loading grace |
 | Recovery / unresponsive authenticated socket | 15 seconds; permanent disconnect |
 | Unauthenticated socket | 5 seconds |
-| Entire private room | Existing 15-minute hard expiry; never extended by heartbeats |
+| Entire private room in this original recovery runtime | 15-minute hard expiry; never extended by heartbeats |
 
-Invitation and active-session expiry UX, expiry warnings, seamless reconnection,
-additional supported campaign levels and Phase 8C Host/Join polish are separate
-work. The shared camera remains the native local co-op camera. The guest displays
+The subsequent [Host/Join flow](PRIVATE_COOP_HOST_JOIN.md) is merged, and the
+[room-lifetime candidate](PRIVATE_COOP_ROOM_LIFETIME.md) adds separate bounded
+deadlines and warnings. Replay/lobby, seamless reconnection and additional
+supported campaign levels remain separate work. The shared camera remains the
+native local co-op camera. The guest displays
 both players and the authoritative camera; this change introduces no camera rule.
 
 ## Validation and diagnostics

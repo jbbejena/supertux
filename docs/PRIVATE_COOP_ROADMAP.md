@@ -1,11 +1,14 @@
 # SuperTux private browser co-op roadmap
 
-Updated: 2026-10-11 UTC.
+Updated: 2026-10-12 UTC.
 
-Phase 8C's guided phone Host/Join flow is described in
-[PRIVATE_COOP_HOST_JOIN.md](PRIVATE_COOP_HOST_JOIN.md). The merged recovery
-baseline has passed refreshed hosted staging; physical-phone acceptance and
-Phase 8D replay/room-lifetime polish remain separate gates.
+Phase 8C's guided phone Host/Join flow is merged through PR #18 and described in
+[PRIVATE_COOP_HOST_JOIN.md](PRIVATE_COOP_HOST_JOIN.md). Its exact tested candidate
+has passed hosted private staging. The next implementation is
+[Phase 8D replay/lobby and room lifetime](PRIVATE_COOP_PHASE8D_PLAN.md), followed
+by physical-phone acceptance (8E) and one additional supported level (8F).
+At the user's request, [room lifetime](PRIVATE_COOP_ROOM_LIFETIME.md) is implemented
+before replay/lobby on PR #19. Validation and publication remain separate gates.
 
 Status: phases 5, 6A and the contained 6B remote-input proof are implemented.
 Phase 7A adds a controlled guest display of static terrain, both players and the

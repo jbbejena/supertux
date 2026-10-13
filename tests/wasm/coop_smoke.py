@@ -58,7 +58,26 @@ async def run(args, url):
         await host.route('**/index.html?coop=1&coop_debug=1',lambda r:r.fulfill(body=html,content_type='text/html'))
         await host.goto(url+'index.html?coop=1&coop_debug=1')
         await host.wait_for_function('Module.supertuxReady===true',timeout=180000)
+        await host.evaluate('''() => {
+            window.proofInputFrames=0;const status=Module.supertuxCoop.engineStatus;
+            Module.supertuxCoop.engineStatus=(...args)=>{++proofInputFrames;status(...args);};
+        }''')
         await host.locator('#start_button').click();await host.wait_for_function('Module.supertuxShell.active')
+        async def host_key(key):
+            # Observe input consumption after dispatching each edge; an old
+            # frame or a wall-clock delay cannot prove SDL saw the event.
+            # Title recovery reloads the page and retires its instrumentation.
+            await host.evaluate('''() => {
+                if(window.proofInputFrames!==undefined)return;
+                window.proofInputFrames=0;const status=Module.supertuxCoop.engineStatus;
+                Module.supertuxCoop.engineStatus=(...args)=>{++proofInputFrames;status(...args);};
+            }''')
+            await host.keyboard.down(key)
+            frame=await host.evaluate('proofInputFrames')
+            await host.wait_for_function('(frame)=>proofInputFrames>frame',arg=frame)
+            await host.keyboard.up(key)
+            frame=await host.evaluate('proofInputFrames')
+            await host.wait_for_function('(frame)=>proofInputFrames>frame',arg=frame)
         async def status_after(text, start=0):
             for _ in range(600):
                 if any('Setting status: '+text in line for line in logs[start:]):return
@@ -89,7 +108,15 @@ async def run(args, url):
             await guest.wait_for_function('window.supertuxGuest && supertuxGuest.state.connected')
             await host.wait_for_function('Module.supertuxCoop.state.reserved===1')
             await host.evaluate("window.proofCloses=[];Module.supertuxCoop.connection.socket.addEventListener('close',e=>proofCloses.push({code:e.code,reason:e.reason,time:Date.now()}))")
-            await guest.evaluate("window.proofCloses=[];supertuxGuest.connection.socket.addEventListener('close',e=>proofCloses.push({code:e.code,reason:e.reason,time:Date.now()}))")
+            await guest.evaluate('''() => {
+                window.proofCloses=[];window.proofSessions=[];
+                supertuxGuest.connection.socket.addEventListener('close',e=>proofCloses.push({code:e.code,reason:e.reason,time:Date.now()}));
+                const connection=supertuxGuest.connection,message=connection.events.message;
+                connection.events.message=value=>{
+                    if(value.type==='session'){proofSessions.push({generation:value.generation,enabled:value.enabled});if(proofSessions.length>16)proofSessions.shift();}
+                    message(value);
+                };
+            }''')
             assert not await host.evaluate('Module.supertuxCoop.state.enabled')
             report['checks'].append('Two independent browsers join actual Worker/Durable Object before level; remote slot reserved without a local device; menus reject guest gameplay')
             # A briefly stalled receiver must coalesce diagnostic status, not
@@ -107,13 +134,25 @@ async def run(args, url):
             assert await guest.evaluate('supertuxGuest.state.connected')
             report['checks'].append('Actual relay fills its 32-message receive window; latest diagnostic status drains after delayed credits without disconnecting or queuing history')
             await host.locator('#coop_panel > summary').click()
-        async def guest_active():
-            try:await guest.wait_for_function('supertuxGuest.state.enabled',timeout=15000)
-            except Exception:
-                diagnostic={'host':await host.evaluate('({state:Module.supertuxCoop.state,status:document.querySelector("#coop_status").textContent,closes:proofCloses})'),
-                            'guest':await guest.evaluate('({state:supertuxGuest.state,status:document.querySelector("#guest_status").textContent,closes:proofCloses})')}
-                (args.output/'timeout-state.json').write_text(json.dumps(diagnostic,indent=2))
-                raise AssertionError(diagnostic)
+        async def guest_active(neutral=False, newer_than=None):
+            # Host-side reset alone does not mean the guest has consumed its
+            # new generation. Wait for both owners and native acceptance of a
+            # fresh packet, rather than immediately pressing into old state.
+            deadline=asyncio.get_running_loop().time()+15
+            while asyncio.get_running_loop().time()<deadline:
+                native=await host.evaluate('Module.supertuxCoop.state')
+                peer=await guest.evaluate('supertuxGuest.state')
+                if (native['enabled'] and native['sequence']>0 and peer['connected'] and peer['enabled'] and
+                    peer['generation']==native['generation'] and (not neutral or peer['mask']==0) and
+                    (newer_than is None or native['generation']!=newer_than)):
+                    confirmed=await host.evaluate('Module.supertuxCoop.state')
+                    if confirmed['enabled'] and confirmed['generation']==native['generation']:
+                        return confirmed['generation']
+                await host.wait_for_timeout(40)
+            diagnostic={'host':await host.evaluate('({state:Module.supertuxCoop.state,status:document.querySelector("#coop_status").textContent,closes:proofCloses})'),
+                        'guest':await guest.evaluate('({state:supertuxGuest.state,status:document.querySelector("#guest_status").textContent,closes:proofCloses,sessions:proofSessions})')}
+            (args.output/'timeout-state.json').write_text(json.dumps(diagnostic,indent=2))
+            raise AssertionError(diagnostic)
         await host.locator('#canvas').focus()
         # The standard packaged campaign path, including story and world map.
         # Shell Start/room clicks can leave the mouse hovering another menu
@@ -134,13 +173,18 @@ async def run(args, url):
 
         async def script(command, paused=True):
             await host.locator('#canvas').focus()
-            if paused: await host.keyboard.press('Escape',delay=150)
-            await host.keyboard.press('Backquote',delay=100)
-            await host.wait_for_timeout(250)
-            await host.keyboard.type(command,delay=8);await host.keyboard.press('Enter',delay=100)
-            assert any('> '+command in line for line in logs[-20:]),('Script fixture was not typed',logs[-4:])
-            await host.keyboard.press('Backquote',delay=100)
-            if paused: await host.keyboard.press('Escape',delay=150)
+            if paused:
+                await host_key('Escape')
+                await host.wait_for_function("Module.ccall('get_browser_menu_state','number',[],[])===1")
+            await host_key('Backquote')
+            start=len(logs)
+            await host.keyboard.type(command,delay=8);await host_key('Enter')
+            await host.wait_for_function('(expected)=>document.querySelector("#output").textContent.includes(expected)',arg='> '+command)
+            assert any('> '+command in line for line in logs[start:]),('Script fixture was not typed',logs[-4:])
+            await host_key('Backquote')
+            if paused:
+                await host_key('Escape')
+                await host.wait_for_function("Module.ccall('get_browser_menu_state','number',[],[])===0")
 
         async def observer():
             await script('sector.Tux.set_is_intentionally_safe(true);sector.Tux2.set_is_intentionally_safe(true);function cp(p){return p.get_x()+","+p.get_y()+","+p.get_input_held("left")+","+p.get_input_held("right")+","+p.get_input_held("jump")+","+p.get_input_held("action");}coObserver <- newthread(function(){for(local i=0;i<6000;i++){try{print("COOP="+cp(sector.Tux)+"|"+cp(sector.Tux2));}catch(e){return;}wait(0.05);}});coObserver.call();')
@@ -149,8 +193,12 @@ async def run(args, url):
             start=len(samples);deadline=asyncio.get_running_loop().time()+timeout/1000
             while len(samples)<=start or not predicate(samples[-1]):
                 if asyncio.get_running_loop().time()>deadline:
-                    await host.locator('#canvas').screenshot(path=str(args.output/'failure.png'))
                     state=await host.evaluate('({active:Module.supertuxShell.active,audio:Module.supertuxShell.audioState,remote:Module.supertuxCoop?.state,focus:document.hasFocus(),element:document.activeElement.tagName})')
+                    diagnostic={'label':label,'host':state,'samples':samples[-1:]}
+                    if guest:
+                        diagnostic['guest']=await guest.evaluate('({state:supertuxGuest.state,status:document.querySelector("#guest_status").textContent,sessions:proofSessions,closes:proofCloses})')
+                    (args.output/'failure-state.json').write_text(json.dumps(diagnostic,indent=2)+'\n')
+                    await host.locator('#canvas').screenshot(path=str(args.output/'failure.png'))
                     raise AssertionError((label,state,samples[-1:] if samples else [],logs[-6:]))
                 await host.wait_for_timeout(40)
             report['samples'][label]=samples[-1];return samples[-1]
@@ -207,15 +255,15 @@ async def run(args, url):
             report['checks'].append('Actual SDL gamepad connect/disconnect events cannot claim or remove the remote slot')
             # The actual room refuses a third socket before gameplay messages.
             third = await guest.evaluate('''() => new Promise(resolve => {
-                const q=new URLSearchParams(location.hash.slice(1)), s=new WebSocket(supertuxGuest.connection.socket.url,['supertux-coop-v2','guest.'+q.get('token')]);
+                const q=new URLSearchParams(location.hash.slice(1)), s=new WebSocket(supertuxGuest.connection.socket.url,['supertux-coop-v3','guest.'+q.get('token')]);
                 s.onopen=()=>{s.close();resolve(false)};s.onerror=()=>resolve(true);
             })''')
             assert third
             mismatch = await guest.evaluate('''async () => {
-                const r=await (await fetch('/coop/rooms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({protocol:2,build:'a'.repeat(64)})})).json();
+                const r=await (await fetch('/coop/rooms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({protocol:3,build:'a'.repeat(64)})})).json();
                 return await new Promise(resolve=>{const u=new URL('/coop/rooms/'+r.room+'/socket',location.href);u.protocol='ws:';
-                    const s=new WebSocket(u,['supertux-coop-v2','host.'+r.host]);
-                    s.onopen=()=>s.send(JSON.stringify({type:'hello',protocol:2,build:'b'.repeat(64)}));s.onclose=e=>resolve(e.code);});
+                    const s=new WebSocket(u,['supertux-coop-v3','host.'+r.host]);
+                    s.onopen=()=>s.send(JSON.stringify({type:'hello',protocol:3,build:'b'.repeat(64)}));s.onclose=e=>resolve(e.code);});
             }''')
             assert mismatch==1008,mismatch
             report['checks'].append('Actual Durable Object rejects third client and closes a mismatched build before accepting input')
@@ -232,13 +280,37 @@ async def run(args, url):
             await host.wait_for_timeout(300);await sample('late-held-rejected',lambda s:not s[1]['right'])
             await p2('right',True);await sample('before-inactivity',lambda s:s[1]['right'])
             old=await host.evaluate('Module.supertuxCoop.state.generation')
-            await guest.evaluate('window.savedRefresh=supertuxGuest.connection.events.refresh;supertuxGuest.connection.events.refresh=()=>{}')
+            # Deliberately delay the reset notification, reproducing the
+            # missing-barrier race regardless of CI/browser scheduling.
+            await guest.evaluate('''old => {
+                const connection=supertuxGuest.connection;
+                window.savedRefresh=connection.events.refresh;connection.events.refresh=()=>{};
+                window.resetSessions=[];window.resetMessage=connection.events.message;
+                connection.events.message=value=>{
+                    if(value.type==='session'&&value.generation!==old)resetSessions.push(value);
+                    else resetMessage(value);
+                };
+            }''',old)
             await host.wait_for_timeout(1100)
             await sample('inactivity-neutral',lambda s:not s[1]['right'])
             assert await host.evaluate('Module.supertuxCoop.state.generation')!=old
+            await guest.wait_for_function('resetSessions.length>0')
             await guest.evaluate('supertuxGuest.connection.events.refresh=savedRefresh')
             await p2('right',False)
+            await p2('right',True)
+            assert await guest.evaluate('supertuxGuest.state.generation')==old
+            assert await guest.evaluate('supertuxGuest.state.mask')==2
+            await sample('press-before-generation-delivery-stays-neutral',lambda s:not s[1]['right'])
+            await guest.evaluate('''() => {
+                supertuxGuest.connection.events.message=resetMessage;
+                for(const session of resetSessions)resetMessage(session);
+            }''')
+            new=await guest_active(neutral=True,newer_than=old)
+            await sample('fresh-generation-neutral',lambda s:not s[1]['right'])
+            await p2('right',False)
+            report['input_reset']={'previous_generation':old,'recovered_generation':new,'notification_delay_fixture':True}
             report['checks'].append('Delayed old state rejected over relay; stopped input refresh neutralizes held movement and changes generation while connection remains alive')
+            report['checks'].append('A press before a deliberately delayed reset notification is rejected; the acknowledged fresh generation starts neutral and accepts a new press')
             await p2('right',True);await sample('before-host-pause',lambda s:s[1]['right'])
             old=await host.evaluate('Module.supertuxCoop.state.generation')
             await host.keyboard.press('Escape',delay=150)
@@ -286,6 +358,7 @@ async def run(args, url):
         old = await host.evaluate('Module.supertuxCoop.state.generation') if guest else 0
         await script('sector.Tux.kill(true);sector.Tux2.kill(true);coopRestartWait <- newthread(function(){wait(3.4,true);print("COOP_RESTART_READY");});coopRestartWait.call();')
         await host.wait_for_function("document.querySelector('#output').textContent.includes('[SCRIPTING] COOP_RESTART_READY')",timeout=30000)
+        if guest: await guest_active(neutral=True,newer_than=old)
         await observer()
         checkpoint=await sample('all-dead-checkpoint-restart',lambda s:all(abs(v['x']-5360)<5 and v['y']<800 for v in s))
         if guest:

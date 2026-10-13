@@ -207,7 +207,7 @@ def assemble(build, output, cloudflare=False, compression=True):
     # An ordinary HTTP server has no room relay. Private Workers override this
     # exact route; discovery must not manufacture missing-resource errors.
     capability_path = output / 'coop/capabilities.json'
-    write(capability_path, encoded(dict(rooms=False, protocol=2)))
+    write(capability_path, encoded(dict(rooms=False, protocol=3)))
     manifest['frontend']['coop/capabilities.json'] = dict(bytes=capability_path.stat().st_size, sha256=digest(capability_path))
     # The manifest binds code, configuration, inventory, and every payload.
     manifest_bytes = encoded(manifest)

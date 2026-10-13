@@ -287,9 +287,19 @@ async def run(args, url):
         }''')
         movement=time.monotonic()
         await guest.keyboard.down('ArrowRight')
-        await sample('campaign-remote-move',f'SupertuxView.state.drawn.players[1].x>{x+30}')
-        report['metrics']['campaign_input_to_30_world_px_ms']=round((time.monotonic()-movement)*1000)
-        await guest.keyboard.up('ArrowRight')
+        try:
+            await sample('campaign-remote-move',f'SupertuxView.state.drawn.players[1].x>{x+30}')
+            report['metrics']['campaign_input_to_30_world_px_ms']=round((time.monotonic()-movement)*1000)
+            # Movement can reach 30px before two guest repaints share an
+            # interval on a busy software renderer. Observe the geometry we
+            # assert, with a finite deadline, before ending the moving sample.
+            await guest.wait_for_function('''smoothFrames.some((b,i,frames)=>{
+              const a=frames[i-1];return a && a.from===b.from && a.to===b.to &&
+                a.weight<b.weight && JSON.stringify(a.quads)!==JSON.stringify(b.quads);
+            })''',timeout=5000)
+        finally:
+            await guest.keyboard.up('ArrowRight')
+            await guest.evaluate('observeSmooth=false')
         smooth=await guest.evaluate('() => {observeSmooth=false;return smoothFrames}')
         assert smooth and any(s['quads'] for s in smooth), 'Compiled campaign did not render interpolated native player geometry'
         assert all(0<s['weight']<1 for s in smooth)
