@@ -85,3 +85,30 @@ pass on the compiled `77ffcad5f0` runtime with the revised driver.
 Future lobby failures archive both owners, the latest guest baseline and console
 output. Required validation correctly fails on the original Debug failure.
 Final committed-source CI remains the review gate, recorded in PR #20.
+
+
+## Action after the console/death fixture
+
+[Validation 38352227280](https://github.com/jbbejena/supertux/actions/runs/38352227280)
+on `910103c1a8e4ef04bad0ec8e460f365f2fb81624` passes Debug, including the new
+lobby handshake/stall and second-level suites. Release passes its Chromium
+suites, then the existing WebKit diagnostic input proof fails at `coop-respawn`.
+Its failure records connected, enabled owners at generation 23, accepted
+sequence 114 and neutral input on both sides while Player 2 remains down. The
+native respawn implementation requires a fresh pressed Action edge, which the
+recorded failure never observes.
+
+The console helper observed the native menu closing, but did not wait for the
+guest to consume the resumed input generation. Observe fresh matching owners
+and successive native receipts after paused console fixtures and immediately
+before the respawn Action. Record each key edge's before/after guest state and
+native state, and require the current guest to accept the Action bit before
+waiting for the original native respawn-position assertion. These observations
+do not force respawn, replay retired input or relax the gameplay assertion.
+The original failure did not retain edge history, so it cannot establish the
+exact scheduling at the lost press.
+
+The compiled `910103c1a8` runtime with this driver passes all 19 Linux WebKit
+remote-input checks, including the retained delayed-reset fixture, ordinary
+Action respawn, checkpoint, transition, title/rejoin and saves. Final-source CI
+results remain recorded in PR #20. The original failed runs are preserved.

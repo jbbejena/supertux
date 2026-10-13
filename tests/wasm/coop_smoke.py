@@ -174,8 +174,13 @@ async def run(args, url):
                 if (native['enabled'] and native['sequence']>0 and peer['connected'] and peer['enabled'] and
                     peer['generation']==native['generation'] and (not neutral or peer['mask']==0) and
                     (newer_than is None or native['generation']!=newer_than)):
+                    await host.wait_for_function('([generation,sequence])=>Module.supertuxCoop.state.generation!==generation || Module.supertuxCoop.state.sequence>sequence',
+                                                 arg=[native['generation'],native['sequence']],timeout=max(1,int((deadline-asyncio.get_running_loop().time())*1000)))
                     confirmed=await host.evaluate('Module.supertuxCoop.state')
-                    if confirmed['enabled'] and confirmed['generation']==native['generation']:
+                    refreshed=await guest.evaluate('supertuxGuest.state')
+                    if (confirmed['enabled'] and confirmed['generation']==native['generation'] and
+                        confirmed['sequence']>native['sequence'] and refreshed['enabled'] and
+                        refreshed['generation']==confirmed['generation'] and (not neutral or refreshed['mask']==0)):
                         return confirmed['generation']
                 await host.wait_for_timeout(40)
             diagnostic={'host':await host.evaluate('({state:Module.supertuxCoop.state,status:document.querySelector("#coop_status").textContent,closes:proofCloses})'),
@@ -214,6 +219,7 @@ async def run(args, url):
             if paused:
                 await host_key('Escape')
                 await host.wait_for_function("Module.ccall('get_browser_menu_state','number',[],[])===0")
+                if guest: await guest_active(neutral=True)
 
         async def observer():
             await script('sector.Tux.set_is_intentionally_safe(true);sector.Tux2.set_is_intentionally_safe(true);function cp(p){return p.get_x()+","+p.get_y()+","+p.get_input_held("left")+","+p.get_input_held("right")+","+p.get_input_held("jump")+","+p.get_input_held("action");}coObserver <- newthread(function(){for(local i=0;i<6000;i++){try{print("COOP="+cp(sector.Tux)+"|"+cp(sector.Tux2));}catch(e){return;}wait(0.05);}});coObserver.call();')
@@ -223,7 +229,7 @@ async def run(args, url):
             while len(samples)<=start or not predicate(samples[-1]):
                 if asyncio.get_running_loop().time()>deadline:
                     state=await host.evaluate('({active:Module.supertuxShell.active,audio:Module.supertuxShell.audioState,remote:Module.supertuxCoop?.state,focus:document.hasFocus(),element:document.activeElement.tagName})')
-                    diagnostic={'label':label,'host':state,'samples':samples[-1:]}
+                    diagnostic={'label':label,'host':state,'samples':samples[-1:],'input_edges':report.get('input_edges',[])}
                     if guest:
                         diagnostic['guest']=await guest.evaluate('({state:supertuxGuest.state,status:document.querySelector("#guest_status").textContent,sessions:proofSessions,closes:proofCloses})')
                     (args.output/'failure-state.json').write_text(json.dumps(diagnostic,indent=2)+'\n')
@@ -234,7 +240,11 @@ async def run(args, url):
         async def p2(control, down):
             if guest:
                 key={'left':'ArrowLeft','right':'ArrowRight','jump':'Space','action':'ControlLeft','up':'ArrowUp'}[control]
+                before=await guest.evaluate('supertuxGuest.state')
                 await (guest.keyboard.down(key) if down else guest.keyboard.up(key))
+                after=await guest.evaluate('supertuxGuest.state')
+                report.setdefault('input_edges',[]).append({'control':control,'down':down,'before':before,'after':after,
+                                                           'native':await host.evaluate('Module.supertuxCoop.state')})
             else: await host.evaluate('([button,value])=>pad(1,button,value)',[{'left':14,'right':15,'jump':0,'action':2,'up':12}[control],int(down)])
 
         start=await sample('spawn',lambda s:all(v['y']<800 for v in s))
@@ -363,7 +373,9 @@ async def run(args, url):
         # rendering. Wait on the same simulation clock before pressing Action.
         await script('sector.Tux2.kill(true);coopDeathWait <- newthread(function(){wait(3.1,true);print("COOP_DEATH_READY");});coopDeathWait.call();')
         await host.wait_for_function("document.querySelector('#output').textContent.includes('[SCRIPTING] COOP_DEATH_READY')",timeout=30000)
+        if guest: await guest_active(neutral=True)
         await p2('action',True)
+        if guest: assert await guest.evaluate('supertuxGuest.state.mask') & 32, 'Respawn Action was not accepted by the current guest input generation'
         await sample('coop-respawn',lambda s:abs(s[1]['x']-s[0]['x'])<100 and s[1]['y']<800,timeout=15000)
         await p2('action',False)
         report['checks'].append('Host-only kill fixture exercises existing Player 2 death and ordinary co-op Action respawn without killing Player 1')
