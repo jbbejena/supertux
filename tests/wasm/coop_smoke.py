@@ -58,7 +58,20 @@ async def run(args, url):
         await host.route('**/index.html?coop=1&coop_debug=1',lambda r:r.fulfill(body=html,content_type='text/html'))
         await host.goto(url+'index.html?coop=1&coop_debug=1')
         await host.wait_for_function('Module.supertuxReady===true',timeout=180000)
+        await host.evaluate('''() => {
+            window.proofInputFrames=0;const status=Module.supertuxCoop.engineStatus;
+            Module.supertuxCoop.engineStatus=(...args)=>{++proofInputFrames;status(...args);};
+        }''')
         await host.locator('#start_button').click();await host.wait_for_function('Module.supertuxShell.active')
+        async def host_key(key):
+            # Observe input consumption after dispatching each edge; an old
+            # frame or a wall-clock delay cannot prove SDL saw the event.
+            await host.keyboard.down(key)
+            frame=await host.evaluate('proofInputFrames')
+            await host.wait_for_function('(frame)=>proofInputFrames>frame',arg=frame)
+            await host.keyboard.up(key)
+            frame=await host.evaluate('proofInputFrames')
+            await host.wait_for_function('(frame)=>proofInputFrames>frame',arg=frame)
         async def status_after(text, start=0):
             for _ in range(600):
                 if any('Setting status: '+text in line for line in logs[start:]):return
@@ -154,13 +167,18 @@ async def run(args, url):
 
         async def script(command, paused=True):
             await host.locator('#canvas').focus()
-            if paused: await host.keyboard.press('Escape',delay=150)
-            await host.keyboard.press('Backquote',delay=100)
-            await host.wait_for_timeout(250)
-            await host.keyboard.type(command,delay=8);await host.keyboard.press('Enter',delay=100)
-            assert any('> '+command in line for line in logs[-20:]),('Script fixture was not typed',logs[-4:])
-            await host.keyboard.press('Backquote',delay=100)
-            if paused: await host.keyboard.press('Escape',delay=150)
+            if paused:
+                await host_key('Escape')
+                await host.wait_for_function("Module.ccall('get_browser_menu_state','number',[],[])===1")
+            await host_key('Backquote')
+            start=len(logs)
+            await host.keyboard.type(command,delay=8);await host_key('Enter')
+            await host.wait_for_function('(expected)=>document.querySelector("#output").textContent.includes(expected)',arg='> '+command)
+            assert any('> '+command in line for line in logs[start:]),('Script fixture was not typed',logs[-4:])
+            await host_key('Backquote')
+            if paused:
+                await host_key('Escape')
+                await host.wait_for_function("Module.ccall('get_browser_menu_state','number',[],[])===0")
 
         async def observer():
             await script('sector.Tux.set_is_intentionally_safe(true);sector.Tux2.set_is_intentionally_safe(true);function cp(p){return p.get_x()+","+p.get_y()+","+p.get_input_held("left")+","+p.get_input_held("right")+","+p.get_input_held("jump")+","+p.get_input_held("action");}coObserver <- newthread(function(){for(local i=0;i<6000;i++){try{print("COOP="+cp(sector.Tux)+"|"+cp(sector.Tux2));}catch(e){return;}wait(0.05);}});coObserver.call();')
@@ -334,6 +352,7 @@ async def run(args, url):
         old = await host.evaluate('Module.supertuxCoop.state.generation') if guest else 0
         await script('sector.Tux.kill(true);sector.Tux2.kill(true);coopRestartWait <- newthread(function(){wait(3.4,true);print("COOP_RESTART_READY");});coopRestartWait.call();')
         await host.wait_for_function("document.querySelector('#output').textContent.includes('[SCRIPTING] COOP_RESTART_READY')",timeout=30000)
+        if guest: await guest_active(neutral=True,newer_than=old)
         await observer()
         checkpoint=await sample('all-dead-checkpoint-restart',lambda s:all(abs(v['x']-5360)<5 and v['y']<800 for v in s))
         if guest:

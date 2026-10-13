@@ -32,6 +32,15 @@ with generation 10 → 11 on the room-lifetime runtime
 `87114523ae6f7e86853b950c62fc984bb3f7bbaf` plus the revised test driver.
 Final committed-source CI results are recorded in PR #19.
 
+The first local Debug run on `ec9387484b6bc81d1bd6fb75028767f44d73ad53`
+passes that reset scenario but fails later when the checkpoint observer's console
+fixture command is not submitted. Its original console log is retained. The
+fixture previously used 100/150 ms key presses and checked only the last 20 log
+lines. It now observes a native input update after each dispatched down/up edge,
+waits for menu transitions and the actual echoed command, and waits for a fresh
+post-restart remote generation before reinstalling the observer. The ordinary
+checkpoint/input assertions remain unchanged; no game input API is bypassed.
+
 Future failures capture both owners, the last 16 session notifications and the
 latest native sample before screenshot readback, so an actual recovery defect
 can be distinguished from an observation race. Reports contain no room URLs or
