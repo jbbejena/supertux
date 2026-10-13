@@ -476,6 +476,9 @@ public:
 
   void multiplayer_prepare_spawn();
 
+  /** Revive a fallen teammate beside the living player activating a checkpoint. */
+  void respawn_at_checkpoint(const Player& activator);
+
   inline void set_ending_direction(int direction) { m_ending_direction = direction; }
   inline int get_ending_direction() const { return m_ending_direction; }
 
@@ -525,6 +528,7 @@ private:
   void prev_target();
 
   void multiplayer_respawn();
+  void multiplayer_respawn(const Vector& pos);
 
   void stop_rolling(bool violent = true);
 

@@ -17,6 +17,18 @@ camera. The guest presents the native scene and controls Player 2, without
 running collisions or writing progression. The native shared camera follows
 both living players, including zoom when they separate.
 
+Reaching a fresh checkpoint automatically revives fallen teammates beside the
+living player who rings it, including during the death animation. Player 2
+needs no Action press. Living teammates keep their positions and bonuses.
+An already activated bell does not repeatedly revive players; the ordinary
+Action respawn and all-player death/checkpoint restart remain available. This
+native co-op rule also applies to local/native multiplayer, and works when
+Player 2 reaches a fresh checkpoint to revive Player 1.
+Player/checkpoint C++ changes select Debug WASM as well as Release WASM,
+representative Linux and lint in focused CI. The browser suites cover revival
+of fully dead and dying players, living teammates, used bells, ordinary Action
+respawning and all-player checkpoint restart.
+
 Select before starting. Replay and automatic first-to-second-level handoff in
 the same room remain a separate Phase 8D task. To change levels, expand the host
 panel, choose **Close room**, then **Return to title**. The host flushes saves
