@@ -177,9 +177,10 @@ async def run(args, url):
             # Kill Player 2 before touching the untouched bell. Only Player 1
             # activates it; no guest Action or fixture revival is sent.
             await script('sector.Tux.set_pos(6384,512);sector.Tux2.kill(true);')
-            await sample('dead-before-checkpoint',"SupertuxView.state.drawn.players[0].dead===0 && SupertuxView.state.drawn.players[1].dead===2 && SupertuxView.state.drawn.world.checkpoint===null")
+            fallen = await sample('dead-before-checkpoint',"SupertuxView.state.drawn.players[0].dead===0 && SupertuxView.state.drawn.players[1].dead===2 && SupertuxView.state.drawn.world.checkpoint===null")
             await script('sector.Tux.set_pos(6448,512);')
             checkpoint = await sample('checkpoint',"SupertuxView.state.drawn.world.checkpoint?.[0]===6448 && SupertuxView.state.drawn.players.every(p=>p.dead===0) && Math.abs(SupertuxView.state.drawn.players[1].x-SupertuxView.state.drawn.players[0].x)<5")
+            assert checkpoint['epoch'] == fallen['epoch'], 'Revival must not restart the level'
             assert await host.evaluate('levelPacket.players.every(p=>p.dead===0)')
             await coop_smoke.ready_for_view_input(host,guest)
             revived_x = checkpoint['players'][1]['x']
