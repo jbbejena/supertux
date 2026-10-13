@@ -66,6 +66,12 @@ async def run(args, url):
         async def host_key(key):
             # Observe input consumption after dispatching each edge; an old
             # frame or a wall-clock delay cannot prove SDL saw the event.
+            # Title recovery reloads the page and retires its instrumentation.
+            await host.evaluate('''() => {
+                if(window.proofInputFrames!==undefined)return;
+                window.proofInputFrames=0;const status=Module.supertuxCoop.engineStatus;
+                Module.supertuxCoop.engineStatus=(...args)=>{++proofInputFrames;status(...args);};
+            }''')
             await host.keyboard.down(key)
             frame=await host.evaluate('proofInputFrames')
             await host.wait_for_function('(frame)=>proofInputFrames>frame',arg=frame)

@@ -40,6 +40,8 @@ lines. It now observes a native input update after each dispatched down/up edge,
 waits for menu transitions and the actual echoed command, and waits for a fresh
 post-restart remote generation before reinstalling the observer. The ordinary
 checkpoint/input assertions remain unchanged; no game input API is bypassed.
+The input-frame hook is reinstated after the suite's deliberate title reload,
+so the later fresh-room/rejoin scenario observes the new native instance.
 
 Future failures capture both owners, the last 16 session notifications and the
 latest native sample before screenshot readback, so an actual recovery defect
