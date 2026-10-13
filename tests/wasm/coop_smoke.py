@@ -405,13 +405,13 @@ async def run(args, url):
             await p2('right',False)
             report['checks'].append('A fresh checkpoint revives Player 2 during its death animation without Action; controls still work after the former death timer expires')
         else:
-            await script('sector.Tux.set_pos(5360,512);sector.Tux2.set_pos(5296,512);')
+            await script('sector.Tux.set_pos(5360,512);sector.Tux2.set_pos(5296,512);sector.Tux.set_velocity(0,0);sector.Tux2.set_velocity(0,0);')
             await sample('checkpoint-bell',lambda s:abs(s[0]['x']-5360)<5 and abs(s[1]['x']-5296)<5 and all(v['y']<800 for v in s))
             report['checks'].append('A fresh checkpoint leaves a living local teammate at its independent position')
 
         # Touching the already active bell with both players alive must leave
         # the other player at its independent position.
-        await script('sector.Tux.set_pos(5360,512);sector.Tux2.set_pos(5296,512);')
+        await script('sector.Tux.set_pos(5360,512);sector.Tux2.set_pos(5296,512);sector.Tux.set_velocity(0,0);sector.Tux2.set_velocity(0,0);')
         await sample('used-checkpoint-living-position',lambda s:abs(s[0]['x']-5360)<5 and abs(s[1]['x']-5296)<5)
         await host.wait_for_timeout(600)
         old = await host.evaluate('Module.supertuxCoop.state.generation') if guest else 0
