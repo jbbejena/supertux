@@ -9,6 +9,10 @@ has passed hosted private staging. The next implementation is
 by physical-phone acceptance (8E) and one additional supported level (8F).
 At the user's request, [room lifetime](PRIVATE_COOP_ROOM_LIFETIME.md) is implemented
 before replay/lobby on PR #19. Validation and publication remain separate gates.
+PR #19 is merged at `7d9ec4388cf67c3d2121f18e7544a4c4c184eaf3`.
+The user requested the [second level](PRIVATE_COOP_SECOND_LEVEL.md) next:
+Phase 8F adds The Journey Begins before remaining Replay/lobby work and
+physical-device acceptance. Automated content coverage does not complete 8E.
 
 Status: phases 5, 6A and the contained 6B remote-input proof are implemented.
 Phase 7A adds a controlled guest display of static terrain, both players and the

@@ -213,7 +213,7 @@
     #coop_panel > summary { min-height: 44px; cursor: pointer; display: flex; align-items: center; }
     #coop_panel button { min-height: 44px; padding: 8px 12px; border: 1px solid #a5c7ed; border-radius: 8px;
       background: #285484; color: white; font: inherit; touch-action: manipulation; }
-    #coop_panel input { width: 100%; min-height: 44px; padding: 8px; font: inherit; }
+    #coop_panel input, #coop_panel select { width: 100%; min-height: 44px; padding: 8px; font: inherit; }
     #coop_panel a { color: #a5c7ed; overflow-wrap: anywhere; }
     #coop_lifetime { position: absolute; top: 4px; left: 50%; transform: translateX(-50%);
       max-width: calc(100% - 24px); width: max-content; margin: 0; padding: 6px 10px;
@@ -240,7 +240,7 @@
   <div id="game_area">
   <details id="coop_panel" hidden>
     <summary>Private co-op</summary>
-    <p>Play Welcome to Antarctica together on two devices. Start from the title screen; the host controls menus and saves.</p>
+    <p>Play the first two Icy Island levels together on two devices. Start from the title screen; the host controls menus and saves.</p>
     <div class="coop_actions"><button id="coop_create" type="button" disabled>Host game</button><button id="coop_close" type="button" hidden>Close room</button></div>
     <p id="coop_status" role="status" aria-live="polite">Press Start, then host a game or join an invitation.</p>
     <div id="coop_invite" hidden>
@@ -250,12 +250,15 @@
       <div id="coop_manual" hidden><label for="coop_invitation">Copy this invitation</label><input id="coop_invitation" readonly autocomplete="off" spellcheck="false"></div>
       <p><a id="coop_view_link" target="_blank" rel="noreferrer">Open Player 2 invitation</a></p>
     </div>
+    <div id="coop_level_choice"><label for="coop_level">Level</label><select id="coop_level">
+      <option value="0">Welcome to Antarctica</option><option value="3">The Journey Begins</option>
+    </select></div>
     <div class="coop_actions"><button id="coop_antarctica" type="button" disabled>Start together</button></div>
     <details id="coop_join_form"><summary>Join game</summary><label for="coop_join_url">Invitation from the host</label>
       <input id="coop_join_url" type="url" autocomplete="off" spellcheck="false" placeholder="Paste the private invitation">
       <div class="coop_actions"><button id="coop_join_invitation" type="button">Join as Player 2</button></div><p id="coop_join_status" role="status"></p>
     </details>
-    <p>Private preview: one supported level. Invitations last 15 minutes. Once both players join, rooms last up to an hour; waiting or paused rooms close after 10 minutes.</p>
+    <p>Private preview: two supported levels. Choose a level before starting. To change levels, close the room and return to title to save, then invite Player 2 again. Invitations last 15 minutes. Once both players join, rooms last up to an hour; waiting or paused rooms close after 10 minutes.</p>
     <div id="coop_diagnostics" hidden><p>Diagnostic scenes and controller-only testing</p>
       <button id="coop_forest" type="button">Forest test (host screen only)</button>
       <button id="coop_view_start" type="button">Start shared view proof</button>

@@ -64,6 +64,14 @@ static const int SHRINKFADE_LAYER = LAYER_LIGHTMAP - 1;
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 static uint32_t next_coop_session = 0;
+// Keep the shared-view allowlist explicit; other campaign levels stay available
+// to the host without advertising an unverified guest scene.
+static int browser_coop_campaign(const std::string& path)
+{
+  if (path == "levels/world1/welcome_antarctica.stl") return 2;
+  if (path == "levels/world1/journey_begins.stl") return 3;
+  return 0;
+}
 EM_JS(int, browser_coop_wants_view, (), {
   return Module.supertuxCoop && Module.supertuxCoop.wantsView() ? 1 : 0;
 });
@@ -80,8 +88,8 @@ EM_JS(void, browser_coop_view, (uint32_t session, uint32_t epoch, uint32_t seque
   }
   if (Module.supertuxCoop) Module.supertuxCoop.view({type: 'view', session: session,
     epoch: epoch, sequence: sequence, time: performance.now(),
-    scene: supported === 2 ? 'antarctica-v1' : (supported ? 'coop-view-v1' : 'unsupported'),
-    camera: f.slice(0,5), players: players, ...(supported === 2 ? {world: JSON.parse(UTF8ToString(world))} : {})});
+    scene: supported === 3 ? 'journey-v1' : (supported === 2 ? 'antarctica-v1' : (supported ? 'coop-view-v1' : 'unsupported')),
+    camera: f.slice(0,5), players: players, ...(supported >= 2 ? {world: JSON.parse(UTF8ToString(world))} : {})});
 });
 EM_JS(int, browser_coop_scene_ready, (uint32_t session, uint32_t epoch), {
   return !Module.supertuxCoop || Module.supertuxCoop.sceneReady(session, epoch) ? 1 : 0;
@@ -552,7 +560,7 @@ bool
 GameSession::is_active() const
 {
 #ifdef __EMSCRIPTEN__
-  if (m_levelfile == "levels/world1/welcome_antarctica.stl" && !browser_coop_scene_ready(m_coop_session, m_coop_epoch)) return false;
+  if (browser_coop_campaign(m_levelfile) && !browser_coop_scene_ready(m_coop_session, m_coop_epoch)) return false;
 #endif
   return !m_game_pause && m_active && !(m_end_sequence && m_end_sequence->is_running());
 }
@@ -596,7 +604,8 @@ GameSession::draw(Compositor& compositor)
 
 #ifdef __EMSCRIPTEN__
   const bool publish_view = browser_coop_wants_view();
-  const bool campaign_view = m_levelfile == "levels/world1/welcome_antarctica.stl" && publish_view;
+  const int campaign = browser_coop_campaign(m_levelfile);
+  const bool campaign_view = campaign && publish_view;
   if (campaign_view) context.color().begin_presentation();
 #endif
   m_currentsector->draw(context);
@@ -607,9 +616,9 @@ GameSession::draw(Compositor& compositor)
     float fields[21] = {transform.first.x, transform.first.y, transform.second,
                         static_cast<float>(SCREEN_WIDTH), static_cast<float>(SCREEN_HEIGHT)};
     const auto& players = m_currentsector->get_players();
-    int supported = players.size() == 2 ? (campaign_view ? 2 : (m_levelfile == "levels/web/coop-view.stl" ? 1 : 0)) : 0;
+    int supported = players.size() == 2 ? (campaign_view ? campaign : (m_levelfile == "levels/web/coop-view.stl" ? 1 : 0)) : 0;
     std::string world;
-    if (supported == 2)
+    if (supported >= 2)
     {
       const std::string commands = context.color().get_presentation();
       if (commands == "null") supported = 0;
@@ -770,7 +779,7 @@ GameSession::update(float dt_sec, const Controller& controller)
 #ifdef __EMSCRIPTEN__
   // Joining/restarting never advances campaign physics before the guest has
   // acknowledged an exact complete scene. Single-player has no relay gate.
-  if (m_levelfile == "levels/world1/welcome_antarctica.stl" && !browser_coop_scene_ready(m_coop_session, m_coop_epoch)) return;
+  if (browser_coop_campaign(m_levelfile) && !browser_coop_scene_ready(m_coop_session, m_coop_epoch)) return;
 #endif
   // Animate the full-completion stats stuff - do this even when the game isn't paused (that's a
   // design choice, if you prefer it not to animate when paused, add `if (!m_game_pause)`).
@@ -957,7 +966,7 @@ GameSession::finish(bool win)
     return;
   m_end_seq_started = true;
 #ifdef __EMSCRIPTEN__
-  if (m_levelfile == "levels/world1/welcome_antarctica.stl") browser_coop_finished(m_coop_session, m_coop_epoch, win);
+  if (browser_coop_campaign(m_levelfile)) browser_coop_finished(m_coop_session, m_coop_epoch, win);
 #endif
 
   using namespace worldmap;

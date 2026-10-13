@@ -4,9 +4,10 @@ const uid = x => Number.isInteger(x) && x > 0 && x <= 0xffffffff;
 const finite = (x, low, high) => typeof x === 'number' && Number.isFinite(x) && x >= low && x <= high;
 const exact = (x, keys) => x && typeof x === 'object' && !Array.isArray(x) && Object.keys(x).length === keys.length && keys.every(key => Object.hasOwn(x, key));
 export function validView(value) {
-  if (!exact(value, ['type','session','epoch','sequence','generation','time','scene','camera','players',...(value?.scene === 'antarctica-v1' ? ['world'] : [])]) || value.type !== 'view' ||
+  const campaign = ['antarctica-v1','journey-v1'].includes(value?.scene);
+  if (!exact(value, ['type','session','epoch','sequence','generation','time','scene','camera','players',...(campaign ? ['world'] : [])]) || value.type !== 'view' ||
       !uint(value.session) || !uint(value.epoch) || !uint(value.sequence) || !uint(value.generation) || !finite(value.time, 0, 1e12) ||
-      !['coop-view-v1','antarctica-v1','unsupported'].includes(value.scene) || !Array.isArray(value.camera) || value.camera.length !== 5 ||
+      !['coop-view-v1','antarctica-v1','journey-v1','unsupported'].includes(value.scene) || !Array.isArray(value.camera) || value.camera.length !== 5 ||
       !value.camera.slice(0,2).every(x => finite(x,-100000,100000)) || !finite(value.camera[2],0.05,10) ||
       !value.camera.slice(3).every(x => Number.isInteger(x) && x >= 100 && x <= 8192) ||
       !Array.isArray(value.players) || value.players.length > 2) return false;
@@ -16,12 +17,12 @@ export function validView(value) {
   for (const player of value.players) {
     if (!exact(player,['id','x','y','action','frame','angle','alpha','dead','visible']) || ![1,2].includes(player.id) || ids.has(player.id) ||
         !finite(player.x,-100000,100000) || !finite(player.y,-100000,100000) ||
-        typeof player.action !== 'string' || !(value.scene === 'antarctica-v1' ? /^[a-z-]{1,64}$/ : /^(?:small-[a-z-]{1,48}|gameover)$/).test(player.action) ||
+        typeof player.action !== 'string' || !(campaign ? /^[a-z-]{1,64}$/ : /^(?:small-[a-z-]{1,48}|gameover)$/).test(player.action) ||
         !Number.isInteger(player.frame) || player.frame < 0 || player.frame > 255 ||
         !finite(player.angle,-3600,3600) || !finite(player.alpha,0,1) || ![0,1,2].includes(player.dead) || typeof player.visible !== 'boolean') return false;
     ids.add(player.id);
   }
-  return value.scene !== 'antarctica-v1' || validWorld(value.world);
+  return !campaign || validWorld(value.world);
 }
 
 const numbers = (a,n,lo=-100000,hi=100000) => Array.isArray(a) && a.length===n && a.every(x=>finite(x,lo,hi));

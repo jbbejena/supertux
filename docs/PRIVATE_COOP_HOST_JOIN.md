@@ -32,7 +32,12 @@ soundtrack or campaign-save database.
 
 After a shared-view guest joins and the native engine reserves Player 2, the
 host sees **Player 2 ready** and **Start together** becomes available. That button
-starts the original **Welcome to Antarctica** and collapses the panel. The
+starts the original selected level and collapses the panel. The second-level
+candidate adds a **Level** selector with **Welcome to Antarctica** (default) and
+**The Journey Begins**, as described in
+[PRIVATE_COOP_SECOND_LEVEL.md](PRIVATE_COOP_SECOND_LEVEL.md). Choose before
+starting; changing levels still requires the save-preserving title/fresh-room
+flow while Replay/lobby remains pending. The
 existing generation/session/epoch baseline acknowledgment still gates simulation;
 connection readiness does not substitute for a valid scene. The host controls
 Player 1, menus and saves. The guest controls Player 2. Both use the shared camera.

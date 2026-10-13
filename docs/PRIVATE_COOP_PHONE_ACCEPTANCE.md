@@ -1,5 +1,10 @@
 # Private co-op: HTTPS staging and phone acceptance
 
+The [second-level candidate](PRIVATE_COOP_SECOND_LEVEL.md) adds The Journey
+Begins through the host Level selector. Private publication is separate; existing
+links support only the exact source listed below until that candidate is published.
+Test both levels on actual phones before claiming expanded mobile acceptance.
+
 ## Current staging and Host/Join
 
 Host/Join PR #18 is merged into `mobile-web-audit` at

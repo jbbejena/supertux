@@ -141,11 +141,13 @@ runs:
       python tests/wasm/coop_smoke.py build/upload --output build/coop-remote-evidence "${coop_options[@]}"
       python tests/wasm/coop_view_smoke.py build/upload --output build/coop-view-evidence "${coop_options[@]}"
       python tests/wasm/coop_lobby_smoke.py build/upload --output build/coop-lobby-evidence "${coop_options[@]}"
+      python tests/wasm/coop_level_smoke.py build/upload --output build/coop-level-evidence "${coop_options[@]}"
       if [ "$BUILD_TYPE" = Release ]; then
         python tests/wasm/coop_smoke.py build/upload --local-only --browser webkit --output build/webkit-coop-local-evidence
         python tests/wasm/coop_smoke.py build/upload --browser webkit --output build/webkit-coop-remote-evidence
         python tests/wasm/coop_view_smoke.py build/upload --browser webkit --output build/webkit-coop-view-evidence
         python tests/wasm/coop_lobby_smoke.py build/upload --browser webkit --output build/webkit-coop-lobby-evidence
+        python tests/wasm/coop_level_smoke.py build/upload --browser webkit --output build/webkit-coop-level-evidence
       fi
     shell: bash
   - uses: actions/upload-artifact@v4
@@ -175,6 +177,8 @@ runs:
         build/webkit-coop-view-evidence/
         build/coop-lobby-evidence/
         build/webkit-coop-lobby-evidence/
+        build/coop-level-evidence/
+        build/webkit-coop-level-evidence/
       if-no-files-found: error
   - uses: actions/upload-artifact@v4
     with:

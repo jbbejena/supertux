@@ -289,7 +289,7 @@ InputManager::update_remote(bool gameplay)
       if (m_remote) m_remote->set_enabled(false);
     }
     else if (fields[0] == 4) reset_remote();
-    else if (fields[0] == 5 && fields[1] < 3) // host-only proof level selection
+    else if (fields[0] == 5 && fields[1] < 4) // host-only allowlisted level selection
     {
       const auto screen = ScreenManager::current();
       if (screen && !screen->get_screen_stack().empty() &&
@@ -310,7 +310,7 @@ InputManager::update_remote(bool gameplay)
         const auto world = World::from_directory(forest ? "levels/world2" : "levels/world1");
         MenuManager::instance().clear_menu_stack();
         GameManager::current()->start_level(*world,
-          forest ? "tux_builder.stl" : "welcome_antarctica.stl", std::nullopt, true);
+          forest ? "tux_builder.stl" : (fields[1] == 3 ? "journey_begins.stl" : "welcome_antarctica.stl"), std::nullopt, true);
       }
     }
   }

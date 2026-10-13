@@ -168,8 +168,8 @@
       if (bytes.byteLength > 4*1024*1024 || await sha(bytes) !== config.manifestSha256) throw Error('Host and guest content differ. Request a new room link.');
       const manifest = JSON.parse(new TextDecoder().decode(bytes));
       const parsed = JSON.parse(new TextDecoder().decode(await checked('coop-scene.json',manifest.frontend['coop-scene.json'],2*1024*1024,combined)));
-      if (parsed.schema !== 1 || parsed.id !== 'coop-view-v1') throw Error('Unsupported shared view scene.');
-      const urls = [...new Set([parsed.tileImage,...Object.values(parsed.actions).flatMap(action=>action.frames),...Object.values(parsed.campaign.textures)])];
+      if (parsed.schema !== 2 || parsed.id !== 'coop-view-v1') throw Error('Unsupported shared view scene.');
+      const urls = [...new Set([parsed.tileImage,...Object.values(parsed.actions).flatMap(action=>action.frames),...Object.values(parsed.campaigns).flatMap(level=>Object.values(level.textures))])];
       const total = urls.reduce((sum,url) => {
         const bytes = manifest.frontend[url]?.bytes;
         if (!Number.isInteger(bytes) || bytes < 0 || bytes > 2*1024*1024) throw Error('Incomplete artwork. Ask the host to update the preview.');
@@ -233,7 +233,7 @@
       context.globalAlpha=kind===0 || kind===4 ? alpha : 1;
       context.globalCompositeOperation=['source-over','lighter','multiply','source-over'][blend];
       if (kind===0) {
-        const url=scene.campaign.textures[p[0].replace(/^\//,'')], raw=images.get(url);
+        const url=scene.campaigns[frame.scene]?.textures[p[0].replace(/^\//,'')], raw=images.get(url);
         if (!raw) {console.warn('Shared view artwork missing:',p[0]);context.restore();freeze('This scene needs artwork outside the supported level. Return to the title screen.');return false;}
         const image=tinted(raw,p[4],url);context.globalAlpha*=p[4][3];
         for (const [sx,sy,sw,sh,x,y,w,h,angle] of p[3]) {
@@ -261,12 +261,12 @@
     return true;
   }
   function paint(frame) {
-    if (frame.scene==='antarctica-v1') {
+    if (scene.campaigns[frame.scene]) {
       if (drawn===frame && playable===enabled) return;
       if (!paintWorld(frame)) return;
       playable=enabled;
       const p2=frame.players.find(p=>p.id===2);
-      status.textContent=frame.world.phase==='finishing' ? 'Level ending · Following the host' : p2.dead===2 ? 'Player 2 is down · Tap Action to rejoin Player 1' : 'Welcome to Antarctica · You control Player 2';
+      status.textContent=frame.world.phase==='finishing' ? 'Level ending · Following the host' : p2.dead===2 ? 'Player 2 is down · Tap Action to rejoin Player 1' : `${scene.campaigns[frame.scene].name} · You control Player 2`;
       return;
     }
     const [cameraX,cameraY,scale,width,height] = frame.camera;
@@ -304,7 +304,7 @@
     if (!outcome && !document.hidden && scene) {
       const frame = buffer.sample(performance.now());
       if (!frame) freeze('Waiting for the host’s next update. Controls are released.');
-      else if (frame.scene !== scene.id && frame.scene !== scene.campaign.id) freeze('This level has no shared view yet. Ask the host to start Welcome to Antarctica.');
+      else if (frame.scene !== scene.id && !scene.campaigns[frame.scene]) freeze('This level has no shared view yet. Ask the host to choose a supported level.');
       else if (enabled || frame.world?.phase==='finishing') paint(frame);
     }
     requestAnimationFrame(tick);
@@ -314,7 +314,7 @@
     setEnabled(value, currentGeneration) {if (enabled === value && generation === currentGeneration) return; enabled = value; generation = currentGeneration; buffer.clear(); if (!enabled && !outcome) freeze('Host is paused or in menus.');},
     accept(frame) {
       if (!frame || frame.generation!==generation) return false;
-      if (frame.scene==='antarctica-v1' && scene && frame.world) {
+      if (scene?.campaigns[frame.scene] && frame.world) {
         // Preparation is exact-build checked before connecting. A complete
         // baseline acknowledgment is allowed during the engine loading gate.
         if (!buffer.accept(frame,performance.now())) return false;

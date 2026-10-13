@@ -11,7 +11,7 @@ function target(extra = {}) {
 }
 function fixture(guest = false, fetch = async () => {throw Error('Unexpected fetch');}, clock = Date, rooms = true, extra = {}) {
   const elements = new Map(['coop_status','coop_lifetime','coop_panel','coop_create','coop_close','coop_link',
-    'coop_antarctica','coop_forest','coop_restart','coop_view_link','coop_invite','coop_manual','coop_invitation',
+    'coop_level','coop_level_choice','coop_antarctica','coop_forest','coop_restart','coop_view_link','coop_invite','coop_manual','coop_invitation',
     'coop_share_status','coop_share','coop_copy','coop_join_form','coop_join_url','coop_join_invitation','coop_join_status','coop_diagnostics',
     ...(guest ? ['guest_status','guest_lifetime','guest_join','guest_ack','guest_progress'] : [])]
     .map(id => [id, target({textContent: '',value:'',focus(){},select(){},removeAttribute(){}})]));
@@ -126,6 +126,22 @@ test('Start together waits for verified shared-view ownership and repeated taps 
   assert.equal(start.disabled,true);assert.equal(f.elements.get('coop_panel').open,false);
   await receive({type:'peer',connected:false});assert.equal(engine.state.guestReady,false);
   assert.equal(f.elements.get('coop_invite').hidden,true);
+});
+
+test('host can select the second level, rejects unknown content and locks one pending start', async () => {
+  const f=fixture(false,roomResponse), engine=f.window.Module.supertuxCoop;
+  await f.elements.get('coop_create').fire('click');
+  const receive=value=>f.sockets[0].fire('message',{data:JSON.stringify(value)});
+  await receive({type:'ready'});await receive({type:'peer',connected:true,view:true});
+  engine.engineStatus(1,false,2,0);while(engine.poll()){}
+  const level=f.elements.get('coop_level'), start=f.elements.get('coop_antarctica');
+  level.value='99';await start.fire('click');assert.equal(engine.poll(),undefined);
+  assert.equal(engine.state.starting,false);
+  level.value='3';await start.fire('click');await start.fire('click');
+  assert.deepEqual(Array.from(engine.poll()),[5,3,0,0]);assert.equal(engine.poll(),undefined);
+  assert.equal(level.disabled,true);
+  engine.engineStatus(1,true,3,1);
+  assert.equal(f.elements.get('coop_level_choice').hidden,true);
 });
 
 test('copy denial offers selected invitation; sharing cancellation does not change room ownership', async () => {
