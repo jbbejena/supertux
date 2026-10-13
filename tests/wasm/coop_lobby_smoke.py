@@ -110,6 +110,25 @@ async def run(args, url):
             await host.wait_for_function("Module.supertuxCoop.connection.lifetime?.kind==='session'")
             assert await host.evaluate('Module.supertuxCoop.connection.lifetime.remainingMs>15*60*1000')
             report['checks'].append('The real relay announces a waiting-room deadline and then an active session with more than the old 15-minute lifetime')
+            generation = await coop_smoke.ready_for_view_input(host,guest)
+            # Reproduce the startup ordering explicitly: a picture is ready,
+            # but the host compositor has not yet completed its next frame.
+            # A key pressed during that gap belongs to the retired generation.
+            stalled = asyncio.Event()
+            def stall_started(message):
+                if message.text=='LOBBY_STARTUP_STALL': stalled.set()
+            host.on('console',stall_started)
+            task = asyncio.create_task(host.evaluate("console.log('LOBBY_STARTUP_STALL');const end=performance.now()+1100;while(performance.now()<end){}"))
+            await asyncio.wait_for(stalled.wait(),timeout=10)
+            assert not task.done(),'Stall signal arrived after the controlled fixture ended'
+            await guest.keyboard.down('ArrowRight')
+            assert await guest.evaluate('supertuxGuest.state.mask')==2
+            await task
+            await guest.wait_for_function('(old)=>supertuxGuest.state.generation>old && supertuxGuest.state.mask===0',arg=generation)
+            await guest.keyboard.up('ArrowRight')
+            host.remove_listener('console',stall_started)
+            await coop_smoke.ready_for_view_input(host,guest)
+            report['checks'].append('Controlled startup-frame stall retires the early held press; the current displayed generation accepts fresh neutral input before a new ordinary key edge')
             x = await guest.evaluate('SupertuxView.state.drawn.players[1].x')
             await guest.keyboard.down('ArrowRight')
             await guest.wait_for_function('(x)=>SupertuxView.playable && SupertuxView.state.drawn.players[1].x>x+20',arg=x)
@@ -229,6 +248,10 @@ async def run(args, url):
             report['checks'].append('Simulated server expiry releases held guest input and pauses the compiled host; failed saving keeps the page open and retry hydrates unchanged settings/progress fixture bytes')
         except Exception as error:
             report['failure'] = str(error)
+            report['diagnostic'] = {
+                'host':await host.evaluate('({state:window.Module?.supertuxCoop?.state,active:window.Module?.supertuxShell?.active,status:document.querySelector("#coop_status")?.textContent})'),
+                'guest':await guest.evaluate('({state:window.supertuxGuest?.state,view:window.SupertuxView?.state,status:document.querySelector("#guest_status")?.textContent,viewStatus:document.querySelector("#view_status")?.textContent})'),
+            }
             raise
         finally:
             release_failure.set()
@@ -236,6 +259,7 @@ async def run(args, url):
                                         not (args.record_known_ub and any(re.search(pattern,line) for pattern in KNOWN_UPSTREAM_UB))]
             report['known_upstream_ub'] = [line for line in logs if 'runtime error:' in line and args.record_known_ub and any(re.search(pattern,line) for pattern in KNOWN_UPSTREAM_UB)]
             (args.output/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+            (args.output/'console.log').write_text('\n'.join(logs)+'\n')
             await hc.close(); await gc.close(); await host_browser.close(); await guest_browser.close()
     assert not report['errors'], report['errors']
     print(json.dumps(report,indent=2),flush=True)

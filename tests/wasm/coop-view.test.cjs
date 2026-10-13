@@ -129,7 +129,7 @@ test('guest renders native faded colors once while texture and text keep their s
     fillText(){calls.push(['text',this.globalAlpha,this.fillStyle]);}};
   const canvas={width:844,height:390,style:{},getContext:()=>context};
   const bytes=Buffer.from('checked image'),url='coop-art/'+createHash('sha256').update(bytes).digest('hex')+'.png';
-  const scene=Buffer.from(JSON.stringify({schema:1,id:'coop-view-v1',tileImage:url,actions:{},campaign:{textures:{'images/test.png':url}}}));
+  const scene=Buffer.from(JSON.stringify({schema:2,id:'coop-view-v1',tileImage:url,actions:{},campaigns:{'antarctica-v1':{textures:{'images/test.png':url},name:'Welcome to Antarctica'},'journey-v1':{textures:{'images/test.png':url},name:'The Journey Begins'}}}));
   const entry=data=>({bytes:data.length,sha256:createHash('sha256').update(data).digest('hex')});
   const manifest=Buffer.from(JSON.stringify({frontend:{'coop-scene.json':entry(scene),[url]:entry(bytes)}}));
   const files=new Map([['manifest.json',manifest],['coop-scene.json',scene],[url,bytes]]);
@@ -148,6 +148,8 @@ test('guest renders native faded colors once while texture and text keep their s
     [4,1,5,0,.5,0,clip,['Text',0,0,16,0,[1,1,1,.4]]],
   ];
   assert.equal(browser.SupertuxView.accept(frame(1,100,0,{generation:0,scene:'antarctica-v1',world:{draw:commands}})),true);
+  assert.equal(browser.SupertuxView.accept(frame(1,200,0,{session:2,generation:0,scene:'journey-v1',world:{draw:[]}})),true);
+  assert.equal(browser.SupertuxView.accept(frame(2,250,0,{session:1,generation:0,scene:'antarctica-v1',world:{draw:commands}})),false,'Retired first-level frames cannot replace the new level');
   assert.deepEqual(calls,[['texture',.2],['panel',1,'rgba(255,255,255,0.2)'],
     ['line',1,'rgba(255,255,255,0.25)'],['gradient',1],['text',.5,'rgba(255,255,255,0.4)']]);
 });
@@ -156,7 +158,7 @@ function preparationFixture() {
   const entry=data=>({bytes:data.length,sha256:createHash('sha256').update(data).digest('hex')});
   const art=Array.from({length:8},(_,i)=>Buffer.from('image-'+i));
   const urls=art.map(bytes=>'coop-art/'+entry(bytes).sha256+'.png');
-  const scene=Buffer.from(JSON.stringify({schema:1,id:'coop-view-v1',tileImage:urls[0],actions:{},campaign:{textures:Object.fromEntries(urls.map((url,i)=>['image-'+i,url]))}}));
+  const scene=Buffer.from(JSON.stringify({schema:2,id:'coop-view-v1',tileImage:urls[0],actions:{},campaigns:{'antarctica-v1':{textures:Object.fromEntries(urls.map((url,i)=>['image-'+i,url]))}}}));
   const manifest=Buffer.from(JSON.stringify({frontend:{'coop-scene.json':entry(scene),...Object.fromEntries(urls.map((url,i)=>[url,entry(art[i])]))}}));
   const files=new Map([['manifest.json',manifest],['coop-scene.json',scene],...urls.map((url,i)=>[url,art[i]])]);
   const stats={active:0,maximum:0,requests:0,corrupt:false,hold:false};

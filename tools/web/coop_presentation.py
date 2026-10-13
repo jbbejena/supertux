@@ -1,4 +1,4 @@
-"""Derived web-only artwork for the arena and the supported campaign level.
+"""Derived web-only artwork for the arena and the supported campaign levels.
 
 Original source assets are copied unchanged; only the host simulates gameplay.
 """
@@ -73,57 +73,64 @@ def derive(source, output, write, encoded):
             if 'regions' in fields or 'images' not in fields: raise ValueError('Unsupported presentation sprite')
             action['frames'] = [image(root / path) for path in fields['images']]
         actions[name] = action
-    # Explicit Phase 7B content inventory. Tile artwork comes from the real
-    # tileset entries used by this level, including tiles converted to objects.
-    level_source = source / 'levels/world1/welcome_antarctica.stl'
-    parsed_level = sexp(level_source.read_text())
-    sector = next(item for item in parsed_level[1:] if item[0] == 'sector')
-    objects = {}
-    tile_ids = set()
-    paths = set()
+    # Inventory each original level independently. Keep unknown levels outside
+    # the guest allowlist, even though the host retains the entire campaign.
+    campaigns = {}
     def leaves(node):
         if isinstance(node, list):
             for item in node: yield from leaves(item)
         else: yield node
-    for item in sector[1:]:
-        objects[item[0]] = objects.get(item[0], 0) + 1
-        if item[0] == 'tilemap':
-            fields = {field[0]: field[1:] for field in item[1:]}
-            encoded_tiles = iter(map(int, fields['tiles']))
-            count = 0
-            for value in encoded_tiles:
-                run = 1
-                if value < 0: run, value = -value, next(encoded_tiles)
-                if value < 0: raise ValueError('Invalid run-length tile value')
-                tile_ids.add(value)
-                count += run
-            if count != int(fields['width'][0]) * int(fields['height'][0]):
-                raise ValueError('Incomplete campaign tilemap')
-        for value in leaves(item):
-            if value.lstrip('/').startswith('images/') and value.endswith('.png'):
-                paths.add(value.lstrip('/'))
-    for item in sexp((source / 'images/tiles.strf').read_text())[1:]:
-        if not isinstance(item, list) or item[0] not in ('tile', 'tiles'): continue
-        ids = {int(v) for field in item[1:] if isinstance(field,list) and field[0] in ('id','ids') for v in field[1:]}
-        if ids & tile_ids:
-            for value in leaves(item):
-                if value.endswith('.png'): paths.add('images/' + value)
-    # Includes all animations/bonus poses, generated projectiles, block debris,
-    # death/explosion effects and checkpoint particles for the audited families.
+    tileset = sexp((source / 'images/tiles.strf').read_text())
     folders = ['creatures/tux','creatures/snowball','creatures/iceblock',
                'creatures/mr_bomb','creatures/jumpy','creatures/stalactite',
                'objects/coin','objects/bonus_block','objects/weak_block',
                'objects/resetpoints','objects/explosion','objects/bullets',
                'objects/water_drop','particles','powerups','decal/explanations','engine/hud']
-    for folder in folders:
-        paths.update(path.relative_to(source).as_posix() for path in (source / 'images' / folder).rglob('*.png'))
-    paths.update(path.relative_to(source).as_posix() for path in (source / 'images/tiles/blocks').glob('brick_piece*.png'))
-    textures = {path: image(source / path) for path in sorted(paths)}
-    fixture['campaign'] = dict(id='antarctica-v1', path='levels/world1/welcome_antarctica.stl',
-                              sourceSha256=hashlib.sha256(level_source.read_bytes()).hexdigest(),
-                              objects=objects, tileIds=sorted(tile_ids), textures=textures)
+    for identity, filename, name, extra_folders in (
+        ('antarctica-v1', 'welcome_antarctica.stl', 'Welcome to Antarctica', []),
+        ('journey-v1', 'journey_begins.stl', 'The Journey Begins', ['creatures/spiky']),
+    ):
+        level_source = source / 'levels/world1' / filename
+        parsed_level = sexp(level_source.read_text())
+        sectors = [item for item in parsed_level[1:] if item[0] == 'sector']
+        if not sectors: raise ValueError('Campaign level has no sectors')
+        objects, tile_ids, paths = {}, set(), set()
+        for sector in sectors:
+            for item in sector[1:]:
+                objects[item[0]] = objects.get(item[0], 0) + 1
+                if item[0] == 'tilemap':
+                    fields = {field[0]: field[1:] for field in item[1:]}
+                    encoded_tiles = iter(map(int, fields['tiles']))
+                    count = 0
+                    for value in encoded_tiles:
+                        run = 1
+                        if value < 0: run, value = -value, next(encoded_tiles)
+                        if value < 0: raise ValueError('Invalid run-length tile value')
+                        tile_ids.add(value)
+                        count += run
+                    if count != int(fields['width'][0]) * int(fields['height'][0]):
+                        raise ValueError('Incomplete campaign tilemap')
+                for value in leaves(item):
+                    if value.lstrip('/').startswith('images/') and value.endswith('.png'):
+                        paths.add(value.lstrip('/'))
+        for item in tileset[1:]:
+            if not isinstance(item, list) or item[0] not in ('tile', 'tiles'): continue
+            ids = {int(v) for field in item[1:] if isinstance(field,list) and field[0] in ('id','ids') for v in field[1:]}
+            if ids & tile_ids:
+                for value in leaves(item):
+                    if value.endswith('.png'): paths.add('images/' + value)
+        # Original animation/bonus poses and indirect defaults: spawned powerups,
+        # debris/projectiles, checkpoint particles, smart ice blocks and spikies.
+        for folder in folders + extra_folders:
+            paths.update(path.relative_to(source).as_posix() for path in (source / 'images' / folder).rglob('*.png'))
+        paths.update(path.relative_to(source).as_posix() for path in (source / 'images/tiles/blocks').glob('brick_piece*.png'))
+        textures = {path: image(source / path) for path in sorted(paths)}
+        campaigns[identity] = dict(name=name, path='levels/world1/' + filename,
+                                   sourceSha256=hashlib.sha256(level_source.read_bytes()).hexdigest(),
+                                   objects=objects, tileIds=sorted(tile_ids), textures=textures)
+    fixture['campaigns'] = campaigns
     fixture.update(tiles=tiles, actions=actions, tileImage=image(source / 'images/tiles/snow/convex.png'),
-                   tileRegions={'14': [32,32,32,32], '11': [32,64,32,32]}, schema=1)
+                   tileRegions={'14': [32,32,32,32], '11': [32,64,32,32]}, schema=2)
     write(art / 'coop-scene.json', encoded(fixture))
     assets['coop-scene.json'] = dict(bytes=(art/'coop-scene.json').stat().st_size,
                                     sha256=hashlib.sha256((art/'coop-scene.json').read_bytes()).hexdigest())

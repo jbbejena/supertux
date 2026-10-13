@@ -1,5 +1,9 @@
 # Private browser co-op: Phase 7B supported level
 
+The [second-level expansion](PRIVATE_COOP_SECOND_LEVEL.md) adds **The Journey Begins**,
+selected before Start together. Its support/validation scope is documented
+separately; the original Phase 7B evidence below remains a historical record.
+
 This runtime is merged through PR #14 at
 `c385d97aba1476a984e497a33c1bd24183c55293`. Its original validation below is
 retained with exact source identities. Follow-on baseline measurements and the
@@ -10,11 +14,12 @@ The current guided Host/Join controls are covered in
 Implementation baseline: `mobile-web-audit` at
 `314e62e20b3f5703bb00683ad59f5ff47beb5661` (merged PR #13).
 
-The explicit shared-view campaign scope is **Welcome to Antarctica**,
+The original Phase 7B shared-view campaign scope is **Welcome to Antarctica**,
 `levels/world1/welcome_antarctica.stl`, for one host and one guest. Original
 levels, images, scripts, physics, audio and single-player/native packaging are
-preserved. Other campaign levels remain controller-only diagnostics and are
-not advertised as synchronized guest scenes.
+preserved. The second-level candidate also supports **The Journey Begins**.
+Other campaign levels remain controller-only diagnostics and are not advertised
+as synchronized guest scenes.
 
 ## Playing
 

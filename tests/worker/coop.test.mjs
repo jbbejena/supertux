@@ -276,6 +276,25 @@ test('campaign complete state has bounded geometry, stable unique IDs and no exe
   ]) {const frame=campaign();mutate(frame);assert.equal(validView(frame),false);}
   const bonus=campaign();bonus.players[0].action='big-walk-right';assert.equal(validView(bonus),true);
 });
+test('second campaign uses the same bounded world validation and retires prior level acknowledgments/results',async()=>{
+  const journey=campaign(1,{scene:'journey-v1',session:2});
+  assert.equal(validView(journey),true);
+  const missing=structuredClone(journey);delete missing.world;assert.equal(validView(missing),false);
+  const injected=structuredClone(journey);injected.world.draw[0][7][0]='https://other.invalid/a.png';assert.equal(validView(injected),false);
+  const f=fixture(),h=f.add('host'),g=f.add('guest');await ready(f,h);
+  await send(f.object,g,{type:'hello',protocol:PROTOCOL,build,view:true});
+  await send(f.object,h,{type:'session',generation:1,enabled:false});
+  await send(f.object,h,campaign());await send(f.object,h,journey);
+  const count=h.messages.filter(p=>p.type==='view-ready').length;
+  await send(f.object,g,{type:'view-ready',session:1,epoch:1,generation:1});
+  assert.equal(h.messages.filter(p=>p.type==='view-ready').length,count);
+  await send(f.object,g,{type:'view-ready',session:2,epoch:1,generation:1});
+  assert.equal(h.messages.at(-1).session,2);
+  const results=g.messages.filter(p=>p.type==='result').length;
+  await send(f.object,h,{type:'result',session:1,epoch:1,generation:1,win:true});
+  assert.equal(g.messages.filter(p=>p.type==='result').length,results);
+});
+
 test('optional native geometry metadata is bounded and player identities belong to the complete world',()=>{
   const value=campaign();value.world.draw[0].push([10,20,1]);
   value.world.entities.push([124,'moving-sprite',40,20,'small-walk-right',0]);value.world.playerUids=[123,124];

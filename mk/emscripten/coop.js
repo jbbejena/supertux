@@ -93,6 +93,8 @@
       set('coop_create','disabled',!supportsRooms || !module.supertuxReady || creating || lost || started || state.reserved === 1 || !!(connection && !connection.closed));
       set('coop_antarctica','disabled',!startReady() || starting || (!diagnostics && started) || !module.supertuxShell?.active);
       set('coop_antarctica','hidden',started && !diagnostics);
+      set('coop_level','disabled',starting || started);
+      set('coop_level_choice','hidden',started && !diagnostics);
       set('coop_close','hidden',!connection || connection.closed);
       set('coop_invite','hidden',!invitation || started || guestReady());
       for (const id of ['coop_share','coop_copy']) set(id,'disabled',!invitation || !connection?.ready);
@@ -292,7 +294,7 @@
     element('coop_share')?.addEventListener('click', async () => {
       const current = invitation;
       if (!current || !connection?.ready || !window.navigator?.share) return;
-      try {await window.navigator.share({title:'SuperTux private co-op',text:'Join me as Player 2 in Welcome to Antarctica.',url:current});}
+      try {await window.navigator.share({title:'SuperTux private co-op',text:'Join me as Player 2 in SuperTux.',url:current});}
       catch (error) {if (error.name !== 'AbortError' && invitation === current) manualCopy();}
     });
     element('coop_join_invitation')?.addEventListener('click', () => {
@@ -317,8 +319,10 @@
     });
     document.getElementById('coop_antarctica')?.addEventListener('click', () => {
       if (!startReady() || starting || (!diagnostics && started) || !module.supertuxShell?.active) {say('Wait for Player 2 to be ready, then press Start together.');return;}
+      const level = Number(element('coop_level')?.value || 0);
+      if (![0,3].includes(level)) {say('Choose one of the supported levels before starting.');return;}
       starting = true; say('Starting together. Waiting for Player 2’s scene…'); render();
-      enqueue([5, 0, 0, 0]);
+      enqueue([5, level, 0, 0]);
       if (panel) panel.open = false;
     });
     document.getElementById('coop_forest')?.addEventListener('click', () => enqueue([5, 1, 0, 0]));
