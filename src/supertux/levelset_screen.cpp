@@ -27,6 +27,13 @@
 #include "util/file_system.hpp"
 #include "util/log.hpp"
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+EM_JS(void, browser_coop_result_ready, (uint32_t session, uint32_t epoch), {
+  Module.supertuxCoop?.completionReady(session, epoch);
+});
+#endif
+
 LevelsetScreen::LevelsetScreen(const std::string& basedir, const std::string& level_filename,
                                Savegame& savegame,
                                const std::optional<std::pair<std::string, Vector>>& start_pos,
@@ -84,6 +91,16 @@ LevelsetScreen::setup()
       m_savegame.set_levelset_state(m_basedir, m_level_filename, m_solved);
       m_savegame.save();
     }
+#ifdef __EMSCRIPTEN__
+    if (m_coop_session)
+    {
+      // Keep this savegame alive between levels. Only the host's exact result
+      // identity can start another allowlisted level, after the native save.
+      m_coop_ready = true;
+      browser_coop_result_ready(m_coop_session, m_coop_epoch);
+      return;
+    }
+#endif
     ScreenManager::current()->pop_screen();
   }
   else
@@ -118,6 +135,49 @@ LevelsetScreen::setup()
     }
   }
 }
+
+#ifdef __EMSCRIPTEN__
+void
+LevelsetScreen::hold_coop_result(uint32_t session, uint32_t epoch, int level, bool win)
+{
+  m_coop_session = session;
+  m_coop_epoch = epoch;
+  m_coop_level = level;
+  m_coop_win = win;
+  m_coop_ready = false;
+}
+
+bool
+LevelsetScreen::start_coop_level(uint32_t session, uint32_t epoch, int level)
+{
+  if (!m_coop_ready || session != m_coop_session || epoch != m_coop_epoch ||
+      m_basedir != "levels/world1" || (level != 0 && level != 3) ||
+      (level != m_coop_level && !(m_coop_win && m_coop_level == 0 && level == 3)))
+    return false;
+
+  const std::string filename = level == 3 ? "journey_begins.stl" : "welcome_antarctica.stl";
+  std::unique_ptr<GameSession> screen;
+  try
+  {
+    screen = std::make_unique<GameSession>(FileSystem::join(m_basedir, filename), m_savegame);
+    screen->skip_intro();
+    screen->restart_level();
+  }
+  catch (const std::runtime_error& e)
+  {
+    log_warning << "Couldn't load co-op level: " << e.what() << std::endl;
+    return false;
+  }
+
+  m_level_filename = filename;
+  m_solved = m_savegame.get_levelset_state(m_basedir).get_level_state(filename).solved;
+  m_start_pos.reset();
+  m_coop_session = m_coop_epoch = 0;
+  m_coop_ready = false;
+  ScreenManager::current()->push_screen(std::move(screen));
+  return true;
+}
+#endif
 
 void
 LevelsetScreen::leave()

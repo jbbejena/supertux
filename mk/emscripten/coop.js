@@ -82,7 +82,8 @@
   function host(module) {
     const queue = [], status = document.getElementById('coop_status');
     const element = id => document.getElementById(id), diagnostics = new URLSearchParams(location.search).has('coop_debug');
-    let supportsRooms = false, invitation = '', started = false, starting = false;
+    let supportsRooms = false, invitation = '', started = false, starting = false, completion = null, lastCompletionSession = 0;
+    const levels = {0:{name:'Welcome to Antarctica',scene:'antarctica-v1'},3:{name:'The Journey Begins',scene:'journey-v1'}};
     let relayInterrupted = false, lost = false, recoveryPaused = false, retiredGeneration = null, pauseGeneration = null, lastStall = 0, lastFrame = performance.now();
     let sceneDeadline = 0, sceneKey = null, sceneLoaded = null, connection, creating = false, createEpoch = 0, joinRejected = false, guestView = false, lastView = 0, state = {reserved: 0, enabled: false, generation: 0, sequence: 0}, lastSent = '';
     const say = text => { if (status && status.textContent !== text) status.textContent = text; };
@@ -99,6 +100,20 @@
       set('coop_invite','hidden',!invitation || started || guestReady());
       for (const id of ['coop_share','coop_copy']) set(id,'disabled',!invitation || !connection?.ready);
       set('coop_join_form','hidden',!!invitation || creating || started || lost);
+      const resultOpen = !!(completion && !lost);
+      const resultReady = resultOpen && completion.nativeReady && completion.saved && !completion.saving && !starting &&
+        startReady() && !recoveryPaused && !document.hidden && !!module.supertuxShell?.active;
+      set('coop_result','hidden',!resultOpen);
+      set('coop_result_title','textContent',completion?.transition ? 'Starting together…' : completion?.win ? 'Level complete!' : 'Level ended');
+      set('coop_result_level','textContent',levels[completion?.transition?.level ?? completion?.level]?.name || '');
+      set('coop_result_status','textContent',completion?.message || '');
+      set('coop_replay','disabled',!resultReady);
+      set('coop_next','hidden',!completion?.win || completion.level !== 0);
+      set('coop_next','disabled',!resultReady);
+      set('coop_result_end','hidden',starting || !completion?.win || completion.level !== 3);
+      set('coop_save_retry','hidden',!completion?.saveFailed || starting);
+      set('coop_save_retry','disabled',!!completion?.saving);
+      set('coop_save_continue','hidden',!completion?.saveFailed || starting);
     };
     const clearInvitation = () => {
       invitation = '';
@@ -108,12 +123,19 @@
       for (const id of ['coop_view_link','coop_link']) if (element(id)) element(id).href = '';
       render();
     };
+    const cancelPendingTransition = () => {
+      // Backgrounding can retire a selection before native code consumes it.
+      // Restore choices rather than leaving both screens waiting forever.
+      if (completion?.transition && queue.some(command => command[0] === 6))
+        module.supertuxCoop.transitionRejected(completion.session, completion.epoch);
+    };
     const interrupt = (reason, permanent = false) => {
       if (state.reserved !== 1) return;
       lost ||= permanent;
       if (permanent) clearInvitation();
       recoveryPaused = true;
       pauseGeneration = state.generation;
+      cancelPendingTransition();
       queue.length = 0;
       sceneLoaded = null;
       sceneDeadline = 0;
@@ -122,6 +144,7 @@
       const restart = document.getElementById('coop_restart');
       if (restart) restart.hidden = !lost;
       say(reason);
+      render();
     };
     const retireInput = () => {
       if (retiredGeneration !== null) return;
@@ -134,6 +157,7 @@
         // A lifecycle reset retires controls, not a pending ownership change.
         // Blur can arrive between peer notification and the native poll.
         const peer = value[0] === 4 ? queue.findLast(command => command[0] === 1 || command[0] === 3) : null;
+        cancelPendingTransition();
         queue.length = 0;
         if (peer) queue.push(peer);
       }
@@ -155,6 +179,7 @@
         sceneLoaded = null; sceneDeadline = 0;
         enqueue([4, 0, 0, 0]);
         session();
+        render();
       },
       beforeFrame(gap) {
         lastFrame = performance.now();
@@ -171,6 +196,7 @@
       engineStatus(reserved, enabled, generation, sequence) {
         state = {reserved, enabled: !!enabled, generation, sequence};
         if (enabled) {started = true; starting = false;}
+        if (enabled && completion?.transition?.session) completion = null;
         if (generation !== pauseGeneration) pauseGeneration = null;
         if (generation !== retiredGeneration) retiredGeneration = null;
         if (enabled && module.supertuxShell?.active) recoveryPaused = false;
@@ -178,12 +204,12 @@
         if (key !== lastSent) { lastSent = key; session(); }
         if (reserved === 1) joinRejected = false;
         if (reserved === -2) joinRejected = true;
-        if (connection?.ready && reserved === 1 && !relayInterrupted && !lost && !recoveryPaused) say(enabled ? 'Playing together. You control Player 1; your guest controls Player 2.' : starting ? 'Starting together. Waiting for Player 2’s scene…' : started ? 'Paused. Release controls before continuing.' : guestView ? 'Player 2 ready. Press Start together.' : 'Controller connected. Use the shared-view invitation to play on two screens.');
+        if (connection?.ready && reserved === 1 && !relayInterrupted && !lost && !recoveryPaused) say(enabled ? 'Playing together. You control Player 1; your guest controls Player 2.' : starting ? 'Starting together. Waiting for Player 2’s scene…' : completion ? 'Choose what to play next.' : started ? 'Paused. Release controls before continuing.' : guestView ? 'Player 2 ready. Press Start together.' : 'Controller connected. Use the shared-view invitation to play on two screens.');
         if (connection?.ready && reserved === -1 && !joinRejected) say('Player 2 disconnected. Return to the title screen, rejoin, then start a level.');
         if (connection?.ready && joinRejected) say('Join requires one local player at the title screen. Return there and rejoin before starting a level; reload if local Player 2 was already configured.');
         render();
       },
-      get state() { return {...state, queued: queue.length, joinRejected, relayInterrupted, lost, recoveryPaused, awaitingNativeReset:pauseGeneration !== null, lastStall, guestReady:guestReady(), supportsRooms, starting, started}; },
+      get state() { return {...state, queued: queue.length, joinRejected, relayInterrupted, lost, recoveryPaused, awaitingNativeReset:pauseGeneration !== null, lastStall, guestReady:guestReady(), supportsRooms, starting, started, completion}; },
       get connection() { return connection; },
       wantsView() {return !!(connection?.ready && guestView && state.reserved === 1 && state.generation && Date.now() - lastView >= 100);},
       sceneReady(session, epoch) {
@@ -204,10 +230,76 @@
       view(snapshot) {
         lastView = Date.now();
         if (!connection?.ready || !guestView) return;
+        if (completion?.transition && snapshot.session > completion.session && snapshot.scene === completion.transition.scene)
+          completion.transition.session = snapshot.session;
         connection.send({...snapshot,generation:state.generation});
       },
-      finished(session, epoch, win) {if (connection?.ready && guestView) connection.send({type:'result',session,epoch,generation:state.generation,win:!!win});},
+      finished(session, epoch, win, level) {
+        if (!connection?.ready || !guestView || lost || ![0,3].includes(level) ||
+            !Number.isInteger(session) || session<=lastCompletionSession || !Number.isInteger(epoch) || epoch<=0) return false;
+        lastCompletionSession = session;
+        completion = {session,epoch,win:!!win,level,nativeReady:false,saved:false,saving:false,saveFailed:false,message:'Saving your progress…'};
+        starting = false;
+        module.supertuxShell?.resetInput();
+        connection.send({type:'result',session,epoch,generation:state.generation,win:!!win});
+        render();
+        return true;
+      },
+      completionReady(session, epoch) {
+        if (!completion || completion.session !== session || completion.epoch !== epoch || completion.nativeReady) return;
+        completion.nativeReady = true;
+        saveCompletion();
+      },
+      transitionRejected(session, epoch) {
+        if (!completion?.transition || completion.session !== session || completion.epoch !== epoch || lost) return;
+        completion.transition = null; starting = false;
+        completion.message = 'Could not start the level. Try again when both players are ready.';
+        connection?.send({type:'result',session,epoch,generation:state.generation,win:completion.win});
+        render();
+      },
     };
+    async function saveCompletion() {
+      const result = completion;
+      if (!result?.nativeReady || result.saving || lost) return;
+      result.saving = true; result.saveFailed = false; result.message = 'Saving your progress…'; render();
+      let saved = false;
+      try {saved = await window.supertux_saveFiles?.() === true;} catch {}
+      if (completion !== result || lost) return;
+      result.saving = false; result.saved = saved; result.saveFailed = !saved;
+      result.message = saved ? 'Ready when you are. Player 2 stays in this room.' : 'Progress could not be saved. Retry, or keep playing for this visit.';
+      render();
+      if (module.supertuxShell?.active && !document.hidden)
+        element(saved ? (result.win && result.level===0 ? 'coop_next' : 'coop_replay') : 'coop_save_retry')?.focus?.();
+    }
+    const playAgain = next => {
+      const result = completion;
+      if (!result?.nativeReady || !result.saved || result.saving || starting || !startReady() || recoveryPaused ||
+          !module.supertuxShell?.active || document.hidden || (next && (!result.win || result.level !== 0))) return;
+      const level = next ? 3 : result.level, scene = levels[level].scene;
+      if (!connection.send({type:'transition',session:result.session,epoch:result.epoch,generation:state.generation,scene})) return;
+      starting = true; result.transition = {scene,level}; result.message = `Loading ${levels[level].name}… Waiting for Player 2’s view.`;
+      sceneKey = sceneLoaded = null; sceneDeadline = 0;
+      module.supertuxShell?.resetInput();
+      enqueue([6,level,result.session,result.epoch]);
+      render();
+    };
+    element('coop_replay')?.addEventListener('click', () => playAgain(false));
+    element('coop_next')?.addEventListener('click', () => playAgain(true));
+    element('coop_save_retry')?.addEventListener('click', saveCompletion);
+    element('coop_save_continue')?.addEventListener('click', () => {
+      if (!completion?.saveFailed || completion.saving || lost) return;
+      completion.saved = true; completion.saveFailed = false;
+      completion.message = 'Progress is kept for this visit. Keep this tab open.'; render();
+    });
+    element('coop_result_close')?.addEventListener('click', () => element('coop_close')?.click());
+    window.addEventListener('keydown', event => {
+      if (!completion || lost || !module.supertuxShell?.active || event.key!=='Tab') return;
+      const controls=Array.from(element('coop_result')?.querySelectorAll?.('button:not([hidden]):not(:disabled)') || []);
+      const current=document.activeElement, first=controls[0], last=controls.at(-1);
+      if (first && (!controls.includes(current) || (event.shiftKey ? current===first : current===last))) {
+        event.preventDefault();(event.shiftKey ? last : first).focus();
+      }
+    }, true);
     const panel = document.getElementById('coop_panel');
     if (panel) panel.hidden = true;
     if (element('coop_diagnostics')) element('coop_diagnostics').hidden = !diagnostics;
@@ -407,10 +499,11 @@
               enabled = value.enabled && !relayInterrupted; send(); // fresh neutral state, never held-key replay
             }
             view?.setEnabled(enabled,generation);
-            status.textContent = enabled ? (view ? 'You control Player 2. The host controls Player 1.' : 'Player 2 input active. The game is visible on the host only.') : relayInterrupted ? 'Connection interrupted. Waiting for the host to resume.' : view && !view.state.latest ? 'Player 2 ready. Waiting for the host to press Start together.' : 'Host is paused or in menus. Release controls before continuing.';
+            status.textContent = view?.state.outcome ? 'Waiting for the host’s choice. You stay in this room.' : enabled ? (view ? 'You control Player 2. The host controls Player 1.' : 'Player 2 input active. The game is visible on the host only.') : relayInterrupted ? 'Connection interrupted. Waiting for the host to resume.' : view && !view.state.latest ? 'Player 2 ready. Waiting for the host to press Start together.' : 'Host is paused or in menus. Release controls before continuing.';
           }
           if (value.type === 'view' && view) view.accept(value);
-          if (value.type === 'result' && view) view.result(value);
+          if (value.type === 'result' && view?.result(value)) {enabled=false;clear();status.textContent='Waiting for the host’s choice. You stay in this room.';}
+          if (value.type === 'transition' && view?.transition(value)) {enabled=false;clear();status.textContent='Starting together. Waiting for the new level.';}
           if (value.type === 'ack') document.getElementById('guest_ack').textContent = `Host accepted input ${value.sequence}.`;
         },
         refresh: send,

@@ -253,8 +253,7 @@ async def run(args, url):
             assert report['snapshot_bytes_max'] <= 65536
             assert not any('Shared view artwork missing:' in line for line in logs)
             report['checks'].append('All observed draw textures resolve to verified content; complete snapshots stay below the existing 64 KiB relay bound')
-            await host.locator('#coop_panel').evaluate('(e)=>e.open=true')
-            await host.locator('#coop_close').tap()
+            await host.locator('#coop_result_close').tap()
             await host.wait_for_function('Module.supertuxCoop.state.lost && !Module.supertuxShell.active')
             await host.evaluate('window.levelReloadMarker=true')
             await host.locator('#coop_restart').tap()

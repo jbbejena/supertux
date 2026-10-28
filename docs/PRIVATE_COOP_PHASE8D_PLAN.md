@@ -1,12 +1,12 @@
 # Phase 8D plan: replay, lobby and bounded room lifetime
 
-Plan updated: 2026-10-12 UTC. This is a follow-on implementation plan, not a
-claim that replay or longer rooms are available.
-
-The user subsequently requested room lifetime first, then the failing CI check.
-[PRIVATE_COOP_ROOM_LIFETIME.md](PRIVATE_COOP_ROOM_LIFETIME.md) records that
-implementation on PR #19; the replay/lobby section below remains planned work.
-Existing private staging remains on the previous runtime until tested publication.
+Updated: 2026-10-28 UTC. The bounded room-lifetime work is merged in PR #19.
+The [Replay/Next implementation](PRIVATE_COOP_REPLAY.md) now retains the same
+room for Replay on both supported levels and successful Welcome → Journey.
+This is the chosen bounded completion flow; the broader Return to lobby and
+arbitrary lobby level selector below remain future work. Publication and
+physical-device acceptance remain separate. Earlier starting-point/CI evidence
+below is historical; current validation workflows stay disabled as requested.
 
 ## Starting point
 

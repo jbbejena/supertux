@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <optional>
 #include <string>
 
@@ -49,9 +50,22 @@ public:
 
   void finished_level(bool win);
 
+#ifdef __EMSCRIPTEN__
+  void hold_coop_result(uint32_t session, uint32_t epoch, int level, bool win);
+  bool start_coop_level(uint32_t session, uint32_t epoch, int level);
+#endif
+
 private:
   std::optional<std::pair<std::string, Vector>> m_start_pos;
   bool m_skip_intro;
+
+#ifdef __EMSCRIPTEN__
+  uint32_t m_coop_session = 0;
+  uint32_t m_coop_epoch = 0;
+  int m_coop_level = 0;
+  bool m_coop_win = false;
+  bool m_coop_ready = false;
+#endif
 
   LevelsetScreen(const LevelsetScreen&) = delete;
   LevelsetScreen& operator=(const LevelsetScreen&) = delete;

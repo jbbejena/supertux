@@ -94,8 +94,8 @@ EM_JS(void, browser_coop_view, (uint32_t session, uint32_t epoch, uint32_t seque
 EM_JS(int, browser_coop_scene_ready, (uint32_t session, uint32_t epoch), {
   return !Module.supertuxCoop || Module.supertuxCoop.sceneReady(session, epoch) ? 1 : 0;
 });
-EM_JS(void, browser_coop_finished, (uint32_t session, uint32_t epoch, int win), {
-  if (Module.supertuxCoop) Module.supertuxCoop.finished(session, epoch, win);
+EM_JS(int, browser_coop_finished, (uint32_t session, uint32_t epoch, int win, int level), {
+  return Module.supertuxCoop?.finished(session, epoch, win, level) === true ? 1 : 0;
 });
 #endif
 static const float TELEPORT_FADE_TIME = 1.0f;
@@ -966,7 +966,9 @@ GameSession::finish(bool win)
     return;
   m_end_seq_started = true;
 #ifdef __EMSCRIPTEN__
-  if (browser_coop_campaign(m_levelfile)) browser_coop_finished(m_coop_session, m_coop_epoch, win);
+  const int coop_level = browser_coop_campaign(m_levelfile);
+  if (coop_level && LevelsetScreen::current() && browser_coop_finished(m_coop_session, m_coop_epoch, win, coop_level == 3 ? 3 : 0))
+    LevelsetScreen::current()->hold_coop_result(m_coop_session, m_coop_epoch, coop_level == 3 ? 3 : 0, win);
 #endif
 
   using namespace worldmap;

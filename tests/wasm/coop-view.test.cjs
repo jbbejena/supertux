@@ -148,8 +148,20 @@ test('guest renders native faded colors once while texture and text keep their s
     [4,1,5,0,.5,0,clip,['Text',0,0,16,0,[1,1,1,.4]]],
   ];
   assert.equal(browser.SupertuxView.accept(frame(1,100,0,{generation:0,scene:'antarctica-v1',world:{draw:commands}})),true);
-  assert.equal(browser.SupertuxView.accept(frame(1,200,0,{session:2,generation:0,scene:'journey-v1',world:{draw:[]}})),true);
-  assert.equal(browser.SupertuxView.accept(frame(2,250,0,{session:1,generation:0,scene:'antarctica-v1',world:{draw:commands}})),false,'Retired first-level frames cannot replace the new level');
+  assert.equal(browser.SupertuxView.result({session:1,epoch:1,generation:0,win:true}),true);
+  browser.SupertuxView.setEnabled(false,1);
+  assert.equal(browser.SupertuxView.accept(frame(2,150,0,{generation:1,scene:'antarctica-v1',world:{draw:commands}})),false,'A generation reset cannot reopen a completed scene');
+  assert.equal(browser.SupertuxView.transition({session:1,epoch:1,generation:0,scene:'journey-v1'}),false);
+  assert.equal(browser.SupertuxView.transition({session:1,epoch:1,generation:1,scene:'journey-v1'}),true);
+  assert.equal(browser.SupertuxView.accept(frame(1,200,0,{session:2,generation:1,scene:'antarctica-v1',world:{draw:[]}})),false,'Loading requires the selected target scene');
+  assert.equal(browser.SupertuxView.accept(frame(1,200,0,{session:2,generation:1,scene:'journey-v1',world:{draw:[]}})),true);
+  assert.equal(browser.SupertuxView.state.outcome,null);
+  assert.equal(browser.SupertuxView.state.transition,null);
+  assert.equal(browser.SupertuxView.result({session:1,epoch:1,generation:1,win:true}),false);
+  assert.equal(browser.SupertuxView.accept(frame(2,250,0,{session:1,generation:1,scene:'antarctica-v1',world:{draw:commands}})),false,'Retired first-level frames cannot replace the new level');
+  assert.equal(browser.SupertuxView.result({session:2,epoch:1,generation:1,win:true}),true);
+  assert.equal(browser.SupertuxView.transition({session:2,epoch:1,generation:1,scene:'antarctica-v1'}),false,'The final supported level cannot advance to an unselected scene');
+  assert.equal(browser.SupertuxView.transition({session:2,epoch:1,generation:1,scene:'arbitrary'}),false);
   assert.deepEqual(calls,[['texture',.2],['panel',1,'rgba(255,255,255,0.2)'],
     ['line',1,'rgba(255,255,255,0.25)'],['gradient',1],['text',.5,'rgba(255,255,255,0.4)']]);
 });

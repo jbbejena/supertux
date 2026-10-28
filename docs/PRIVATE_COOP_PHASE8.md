@@ -1,5 +1,12 @@
 # Phase 8: private co-op on phones
 
+Current update (2026-10-28): room lifetime (PR #19), second level (PR #20),
+and checkpoint revival (PR #21) are merged. The [Replay/Next milestone](PRIVATE_COOP_REPLAY.md)
+adds same-room completion choices. Physical-phone acceptance remains outstanding.
+Validation workflows are disabled at the user’s request; local tests and the
+manual exact-integrated-source publication procedure replace CI dispatch for this
+milestone. The measurements and old Actions procedures below are historical.
+
 Phase 7B is merged into `mobile-web-audit` at
 `c385d97aba1476a984e497a33c1bd24183c55293`. Its supported shared-view level is
 the original **Welcome to Antarctica**. The host owns simulation, audio,
@@ -10,8 +17,9 @@ Phase 8B is merged through PR #16 at
 `0a240fc3445efd08610b9d66bf6b647a512fbfca`. Its measured heartbeat failures
 motivate the focused interruption work in
 [PRIVATE_COOP_RECOVERY.md](PRIVATE_COOP_RECOVERY.md), ahead of the 8C room UI.
-This covers neutral pause and bounded socket recovery; replay/lobby polish and
-invitation versus active-session expiry still remain in 8D.
+This covers neutral pause and bounded socket recovery. The later room-lifetime
+and Replay/Next updates above complete the bounded 8D flow; a general lobby
+remains future work.
 
 ## Order of work
 
@@ -211,7 +219,7 @@ do not substitute for ordinary physical-phone playthroughs. Existing dedicated
 audio/touch/save browser gates remain configured; their earlier evidence is
 retained rather than described as newly rerun by this measurement-only change.
 
-### Hosted validation and staging
+### Historical hosted validation and staging
 
 Phase 8A dispatch of WebAssembly at the merged integration branch was rejected
 with HTTP 422: **“Actions has been disabled for this repository.”** Workflow

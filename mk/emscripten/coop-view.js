@@ -141,7 +141,21 @@
   const canvas = document.getElementById('guest_canvas');
   if (!canvas) return;
   const context = canvas.getContext('2d'), status = document.getElementById('view_status'), buffer = new SnapshotBuffer();
-  let outcome = null, readyKey = null, tintCache = new Map(), scene, images = new Map(), enabled = false, generation = 0, drawn = null, loading = null, build = null, playable = false;
+  let outcome = null, transition = null, readyKey = null, tintCache = new Map(), scene, images = new Map(), enabled = false, generation = 0, drawn = null, loading = null, build = null, playable = false;
+  function resultPanel() {
+    const panel = document.getElementById('guest_result');
+    if (!panel) return;
+    panel.hidden = !outcome;
+    const controls = document.getElementById('guest_controls');
+    if (controls?.style) {
+      controls.style.opacity = outcome ? '.45' : '';
+      controls.inert = !!outcome;
+    }
+    const set = (id,text) => {const node=document.getElementById(id);if(node)node.textContent=text;};
+    set('guest_result_title',transition ? 'Starting together…' : outcome?.win ? 'Level complete!' : 'Level ended');
+    set('guest_result_level',scene?.campaigns[transition?.scene || buffer.order?.scene]?.name || '');
+    set('guest_result_status',transition ? 'Waiting for the new level. Controls return when both screens are ready.' : 'Waiting for the host’s choice. You’ll stay in this room.');
+  }
   const sha = async bytes => [...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(x=>x.toString(16).padStart(2,'0')).join('');
   async function checked(url, entry, max, signal) {
     if (!entry || !Number.isInteger(entry.bytes) || entry.bytes < 0 || entry.bytes > max) throw Error('Incomplete shared view assets. Ask the host to update the preview.');
@@ -314,6 +328,8 @@
     setEnabled(value, currentGeneration) {if (enabled === value && generation === currentGeneration) return; enabled = value; generation = currentGeneration; buffer.clear(); if (!enabled && !outcome) freeze('Host is paused or in menus.');},
     accept(frame) {
       if (!frame || frame.generation!==generation) return false;
+      if (outcome && frame.session<=outcome.session) return false;
+      if (transition && (frame.session<=transition.session || frame.scene!==transition.scene)) return false;
       if (scene?.campaigns[frame.scene] && frame.world) {
         // Preparation is exact-build checked before connecting. A complete
         // baseline acknowledgment is allowed during the engine loading gate.
@@ -321,7 +337,7 @@
         const key=`${frame.session}/${frame.epoch}/${frame.generation}`;
         if (readyKey!==key) {
           if (!paintWorld(frame)) return false;
-          readyKey=key;outcome=null;root.SupertuxView.onReady?.(frame);
+          readyKey=key;outcome=null;transition=null;resultPanel();root.SupertuxView.onReady?.(frame);
         }
         return true;
       }
@@ -330,12 +346,19 @@
     },
     result(value) {
       const latest=buffer.order;
-      if (!latest || value.session!==latest.session || value.epoch!==latest.epoch) return;
-      outcome=value;enabled=false;freeze(value.win?'Level complete · The host chooses what to play next':'Level ended · Waiting for the host');
+      if (!latest || value.session!==latest.session || value.epoch!==latest.epoch) return false;
+      outcome=value;transition=null;enabled=false;freeze(value.win?'Level complete · The host chooses what to play next':'Level ended · Waiting for the host');
+      resultPanel();return true;
     },
-    reset() {outcome=null;readyKey=null;tintCache.clear();enabled = false; generation = 0; buffer.reset(); drawn = null; freeze('Waiting for the host.'); context.clearRect(0,0,canvas.width,canvas.height);},
+    transition(value) {
+      const latest=buffer.order;
+      if (!outcome || !latest || !['antarctica-v1','journey-v1'].includes(value.scene) || value.generation!==generation || value.session!==outcome.session || value.epoch!==outcome.epoch ||
+          (value.scene!==latest.scene && !(outcome.win && latest.scene==='antarctica-v1' && value.scene==='journey-v1'))) return false;
+      transition=value;enabled=false;buffer.clear();freeze('Loading the host’s chosen level…');resultPanel();return true;
+    },
+    reset() {outcome=null;transition=null;readyKey=null;tintCache.clear();enabled = false; generation = 0; buffer.reset(); drawn = null; freeze('Waiting for the host.'); context.clearRect(0,0,canvas.width,canvas.height);resultPanel();},
     get playable() {return playable && enabled && !document.hidden;},
-    get state() {return {playable:this.playable,enabled,generation,buffered:buffer.frames.length,drawn,latest:buffer.order,loaded:images.size,outcome};},
+    get state() {return {playable:this.playable,enabled,generation,buffered:buffer.frames.length,drawn,latest:buffer.order,loaded:images.size,outcome,transition};},
   };
   requestAnimationFrame(tick);
 })(typeof window === 'undefined' ? globalThis : window);
