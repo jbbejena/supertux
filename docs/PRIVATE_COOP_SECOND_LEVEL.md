@@ -24,19 +24,20 @@ An already activated bell does not repeatedly revive players; the ordinary
 Action respawn and all-player death/checkpoint restart remain available. This
 native co-op rule also applies to local/native multiplayer, and works when
 Player 2 reaches a fresh checkpoint to revive Player 1.
-Player/checkpoint C++ changes select Debug WASM as well as Release WASM,
-representative Linux and lint in focused CI. The browser suites cover revival
+When enabled, focused CI selects Debug/Release WASM, representative Linux
+and lint for player/checkpoint C++ changes. Validation workflows are currently
+disabled at the user’s request; use the local checks instead. The browser suites cover revival
 of fully dead and dying players, living teammates, used bells, ordinary Action
 respawning and all-player checkpoint restart.
 
-Select before starting. Replay and automatic first-to-second-level handoff in
-the same room remain a separate Phase 8D task. To change levels, expand the host
-panel, choose **Close room**, then **Return to title**. The host flushes saves
-before reloading; failed saving keeps the page open for retry. Select the next
-level and share a fresh invitation. Finite room limits and neutral-input,
-trusted-Resume recovery continue to apply.
-The selector uses the existing native levelset completion records; synchronized
-world-map navigation and automatic campaign advancement remain out of scope.
+Select the initial level before starting. The [same-room completion flow](PRIVATE_COOP_REPLAY.md)
+now offers Replay on either level and Next level after completing Welcome to
+Antarctica. The same invitation and connection remain in use. To select an
+arbitrary starting level again, close the room and use Return to title; the host
+flushes saves before reloading and failed saving permits retry. Finite room
+limits and neutral-input, trusted-Resume recovery continue to apply.
+Synchronized world-map navigation and progression beyond these two levels
+remain out of scope.
 
 ## Supported content
 

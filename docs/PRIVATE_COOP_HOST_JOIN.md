@@ -3,7 +3,7 @@
 Host/Join is merged through [PR #18](https://github.com/jbbejena/supertux/pull/18)
 at `a1b238334fdfdc8bc2fe8f731d2cf9b327808d1b`. The current private publication
 and phone checklist are in [PRIVATE_COOP_PHONE_ACCEPTANCE.md](PRIVATE_COOP_PHONE_ACCEPTANCE.md).
-The next implementation is [Phase 8D replay/lobby and room lifetime](PRIVATE_COOP_PHASE8D_PLAN.md).
+The current completion flow is [same-room Replay and Next level](PRIVATE_COOP_REPLAY.md).
 
 This follows recovery PR #17, merged into `mobile-web-audit` at
 `e7fe8aa180e5dcbe900cd14c833464256ba5f323`. Private staging refresh
@@ -36,8 +36,8 @@ starts the original selected level and collapses the panel. The second-level
 candidate adds a **Level** selector with **Welcome to Antarctica** (default) and
 **The Journey Begins**, as described in
 [PRIVATE_COOP_SECOND_LEVEL.md](PRIVATE_COOP_SECOND_LEVEL.md). Choose before
-starting; changing levels still requires the save-preserving title/fresh-room
-flow while Replay/lobby remains pending. The
+starting; after completion, Replay or successful first-to-second-level Next
+keeps the same room and invitation. Arbitrary reselection uses the title/fresh-room flow. The
 existing generation/session/epoch baseline acknowledgment still gates simulation;
 connection readiness does not substitute for a valid scene. The host controls
 Player 1, menus and saves. The guest controls Player 2. Both use the shared camera.
@@ -76,8 +76,9 @@ retries reuse a fully prepared scene. Immutable artwork HTTP caching and host
 startup/music caching remain unchanged.
 
 Safe interruption, neutral generations and save-flush-before-title restart remain
-as described in [PRIVATE_COOP_RECOVERY.md](PRIVATE_COOP_RECOVERY.md). Phase 8D
-completion/lobby polish remains follow-up work. The
+as described in [PRIVATE_COOP_RECOVERY.md](PRIVATE_COOP_RECOVERY.md). The
+[completion panel](PRIVATE_COOP_REPLAY.md) adds bounded Replay/Next; a general
+lobby remains future work. The
 [room-lifetime update](PRIVATE_COOP_ROOM_LIFETIME.md) separates 15-minute invitations
 from one-hour paired sessions and 10-minute inactive limits, with expiry warnings.
 The published pre-update runtime still uses its original 15-minute entire-room cap.
@@ -109,22 +110,21 @@ failure/retry, readiness, real level start, Player 2 input, portrait/landscape,
 trusted neutral Resume and guest backgrounding. Evidence captures no invitation
 credentials. Headless Chromium uses software page compositing while retaining
 SDL/WebGL; Linux WebKit is not physical Safari. Existing full shared-view,
-remote-input, touch, audio, save and cache checks remain in CI.
+remote-input, touch, audio, save and cache test definitions remain available locally.
 The local-gamepad suite uses ordinary HTTP and asserts that rooms stay hidden.
 Its Forest entry uses the existing native command API as a labelled diagnostic
 fixture; the real room-server suite retains the Forest button interaction.
 
-The existing WASM job runs the lobby suite in Chromium for both configurations
-and in WebKit for Release, retaining evidence. No jobs/workflow-level filters are
-added. Required validation still fails on needed-job failure. The shared action
-change receives Release/Debug WASM, lint/focused tests and representative Linux; manually
-run `WebAssembly` for exact non-PR Release/Debug acceptance before private
-publication. Full-platform manual/weekly/tag access is retained.
+The configured WASM job retains the lobby and other browser suites. At the
+user's request, all ten validation workflows are now disabled; no CI is dispatched
+for the Replay/Next milestone. Existing test definitions and manual full-platform
+coverage remain in the repository for a later explicit reenable request.
 
-Private publication uses **Mobile Web Preview**, the complete candidate SHA as
-`ref`, its exact successful non-PR `validation_run_id`, and `publish_coop=true`.
-Source/toolchain/configuration/manifest and every payload are verified before
-artifact reuse. PR artifacts, missing artifacts and mismatched runs are rejected.
+Private publication uses **Mobile Web Preview**, an exact integrated 40-character
+source SHA as `ref`, and `publish_coop=true`. It can build a fresh pinned Release
+without CI; optional `validation_run_id` reuse remains strict. See
+[PRIVATE_COOP_REPLAY.md](PRIVATE_COOP_REPLAY.md) for the trusted integration gate,
+complete artifact checks, local validation and operator commands.
 Production's workflow/serialization are unchanged.
 
 Local development validation on the merged baseline plus this working-tree change:
@@ -138,9 +138,9 @@ Local development validation on the merged baseline plus this working-tree chang
 | Workflow syntax and diff whitespace | Pass |
 
 These local build identities refer to the baseline plus working-tree edits; final
-committed-source Release/Debug and hosted acceptance are recorded separately in
-the candidate's Actions runs. The first Chromium run preceded small presentation
-and DOM-update improvements; final-source CI must cover those changes.
+committed-source Release/Debug and hosted acceptance for that earlier candidate
+were recorded separately in its Actions runs. The first Chromium run preceded small presentation
+and DOM-update improvements; see the later candidate reports for final-source coverage.
 No physical-device result is inferred from these local results.
 
 Physical iPhone Safari, Android Chrome, OS share sheets and separate networks

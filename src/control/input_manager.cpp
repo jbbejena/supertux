@@ -25,6 +25,7 @@
 #include "gui/menu_manager.hpp"
 #include "supertux/game_manager.hpp"
 #include "supertux/game_session.hpp"
+#include "supertux/levelset_screen.hpp"
 #include "supertux/savegame.hpp"
 #include "supertux/profile_manager.hpp"
 #include "supertux/sector.hpp"
@@ -259,6 +260,9 @@ EM_JS(int, browser_coop_poll, (uint32_t* fields), {
 EM_JS(void, browser_coop_status, (int reserved, int enabled, uint32_t generation, uint32_t sequence), {
   if (Module.supertuxCoop) Module.supertuxCoop.engineStatus(reserved, enabled, generation, sequence);
 });
+EM_JS(void, browser_coop_transition_rejected, (uint32_t session, uint32_t epoch), {
+  Module.supertuxCoop?.transitionRejected(session, epoch);
+});
 #endif
 
 void
@@ -289,6 +293,16 @@ InputManager::update_remote(bool gameplay)
       if (m_remote) m_remote->set_enabled(false);
     }
     else if (fields[0] == 4) reset_remote();
+    else if (fields[0] == 6) // host-only result action, never a guest input mask
+    {
+      const auto screen = ScreenManager::current();
+      auto* levelset = screen && !screen->get_screen_stack().empty() ?
+        dynamic_cast<LevelsetScreen*>(screen->get_screen_stack().back().get()) : nullptr;
+      if (m_remote_connected && levelset && levelset->start_coop_level(fields[2], fields[3], fields[1]))
+        reset_remote();
+      else
+        browser_coop_transition_rejected(fields[2], fields[3]);
+    }
     else if (fields[0] == 5 && fields[1] < 4) // host-only allowlisted level selection
     {
       const auto screen = ScreenManager::current();

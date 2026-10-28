@@ -1,11 +1,27 @@
 # Private co-op: HTTPS staging and phone acceptance
 
-The [second-level candidate](PRIVATE_COOP_SECOND_LEVEL.md) adds The Journey
-Begins through the host Level selector. Private publication is separate; existing
-links support only the exact source listed below until that candidate is published.
-Test both levels on actual phones before claiming expanded mobile acceptance.
+The integrated baseline now includes The Journey Begins (PR #20) and fresh
+checkpoint teammate revival (PR #21). [Same-room Replay and Next level](PRIVATE_COOP_REPLAY.md)
+adds the next completion flow. Merging does not publish private staging;
+**Mobile Web Deploy updates only the single-player Worker**.
 
-## Current staging and Host/Join
+After the Replay/Next PR merges, use Mobile Web Preview with the exact integrated
+40-character source SHA and `publish_coop=true`. A fresh pinned Release build
+no longer requires a CI run. Validation workflows remain disabled at the user's
+request. The optional explicit artifact-reuse path still rejects mismatched or
+missing artifacts. [Publication commands and local tests](PRIVATE_COOP_REPLAY.md#preview-and-publication-without-ci)
+are the current procedure; older CI-dispatch instructions below are historical.
+Check the publication summary and hosted `BUILD_INFO.json` for the actual source.
+No new hosted or physical-device acceptance is claimed by the Replay/Next PR.
+
+On two physical phones, test both host/guest roles across separate networks:
+complete Welcome normally, Replay, complete it again, Next to Journey, activate a
+fresh checkpoint while a teammate is dead, and complete/replay Journey. Confirm
+neutral background/Resume, no Safari selection popup on Jump, one unchanged
+invitation, clear guest waiting/loading, and both earned completions after reload.
+Also verify a deliberate disconnect leaves a safe Close/Return-to-title path.
+
+## Previously published Host/Join staging
 
 Host/Join PR #18 is merged into `mobile-web-audit` at
 `a1b238334fdfdc8bc2fe8f731d2cf9b327808d1b`. Private staging refresh
@@ -67,7 +83,8 @@ are separate from those initial reports. The first non-PR Release attempt fails
 after a 2,508.1 ms information-panel host gap; Debug passes. That failure is
 retained alongside the one failed-job rerun on unchanged source/assertions.
 
-To publish the final correction, first require that its non-PR run concludes
+Historical recovery-only procedure (superseded by the integrated-source flow above):
+to publish the final correction, first require that its non-PR run concludes
 **success**; then use the complete source and that explicit run:
 
 ```sh

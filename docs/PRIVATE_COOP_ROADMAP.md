@@ -1,18 +1,21 @@
 # SuperTux private browser co-op roadmap
 
-Updated: 2026-10-13 UTC.
+Updated: 2026-10-28 UTC.
 
-Phase 8C's guided phone Host/Join flow is merged through PR #18 and described in
-[PRIVATE_COOP_HOST_JOIN.md](PRIVATE_COOP_HOST_JOIN.md). Its exact tested candidate
-has passed hosted private staging. The next implementation is
-[Phase 8D replay/lobby and room lifetime](PRIVATE_COOP_PHASE8D_PLAN.md), followed
-by physical-phone acceptance (8E) and one additional supported level (8F).
-At the user's request, [room lifetime](PRIVATE_COOP_ROOM_LIFETIME.md) is implemented
-before replay/lobby on PR #19. Validation and publication remain separate gates.
-PR #19 is merged at `7d9ec4388cf67c3d2121f18e7544a4c4c184eaf3`.
-The user requested the [second level](PRIVATE_COOP_SECOND_LEVEL.md) next:
-Phase 8F adds The Journey Begins before remaining Replay/lobby work and
-physical-device acceptance. Automated content coverage does not complete 8E.
+The guided phone Host/Join flow (PR #18), bounded room lifetime (PR #19),
+[second level](PRIVATE_COOP_SECOND_LEVEL.md) (PR #20), and checkpoint teammate
+revival (PR #21) are merged. The next coding milestone adds
+[same-room Replay and Next level](PRIVATE_COOP_REPLAY.md), based on merged
+`34d8d40e423129396641ad183fad66c8fe7d0db6`. This keeps one invitation through
+Welcome → Replay or Next Journey → Replay Journey. A general lobby and third
+level remain future work.
+
+After review/merge, explicitly publish private staging and complete physical
+phone acceptance (8E) with both roles on separate networks. Local browser
+fixtures do not complete that acceptance. All validation workflows are disabled
+at the user's request; local checks continue, and manual private publication can
+build an exact integrated source without a validation run. Normal Mobile Web
+Deploy still updates the separate single-player Worker.
 
 Status: phases 5, 6A and the contained 6B remote-input proof are implemented.
 Phase 7A adds a controlled guest display of static terrain, both players and the

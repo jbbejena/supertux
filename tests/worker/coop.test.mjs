@@ -263,6 +263,43 @@ function campaign(sequence=1,extra={}) {
     [0,123,50,0,1,0,[0,0,844,390],['images/objects/coin/coin-0.png',0,0,[[0,0,32,32,10,20,32,32,0]],[1,1,1,1]]]
   ],entities:[[123,'coin',10,20,'normal',0]],coins:42,checkpoint:null,phase:'playing'},...extra});
 }
+test('only the host can select a legal post-result transition; stale results cannot change a new level',async()=>{
+  const f=fixture(),host=f.add('host'),guest=f.add('guest');await ready(f,host);
+  await send(f.object,guest,{type:'hello',protocol:PROTOCOL,build,view:true});
+  await send(f.object,host,{type:'session',generation:1,enabled:false});await send(f.object,host,campaign());
+  const transition={type:'transition',session:1,epoch:1,generation:1,scene:'journey-v1'};
+  await send(f.object,host,transition);
+  assert.equal(guest.messages.some(p=>p.type==='transition'),false);
+  await send(f.object,host,{type:'result',session:1,epoch:1,generation:1,win:false});
+  await send(f.object,host,transition);
+  assert.equal(guest.messages.some(p=>p.type==='transition'),false,'An unsolved level cannot skip forward');
+  await send(f.object,host,{...transition,scene:'antarctica-v1'});
+  assert.equal(guest.messages.at(-1).scene,'antarctica-v1');
+  await send(f.object,host,{type:'result',session:1,epoch:1,generation:1,win:true});
+  await send(f.object,host,transition);
+  assert.equal(guest.messages.at(-1).scene,'journey-v1');
+  const count=guest.messages.filter(p=>p.type==='transition').length;
+  await send(f.object,host,campaign(1,{epoch:2}));
+  await send(f.object,host,transition);
+  assert.equal(guest.messages.filter(p=>p.type==='transition').length,count,'A restarted epoch retires its old result');
+  await send(f.object,host,campaign(1,{session:2,scene:'journey-v1'}));
+  await send(f.object,host,transition);
+  assert.equal(guest.messages.filter(p=>p.type==='transition').length,count);
+  await send(f.object,guest,transition);assert.equal(guest.closed.code,1008);
+});
+
+test('result then transition survive backpressure and hibernation ahead of the next baseline',async()=>{
+  const f=fixture(),host=f.add('host'),guest=f.add('guest');await ready(f,host);
+  await send(f.object,guest,{type:'hello',protocol:PROTOCOL,build,view:true});
+  await send(f.object,host,{type:'session',generation:1,enabled:false});await send(f.object,host,campaign());
+  guest.serializeAttachment({...guest.info,inFlight:32});
+  await send(f.object,host,{type:'result',session:1,epoch:1,generation:1,win:true});
+  await send(new CoopRoom(f.state),host,{type:'transition',session:1,epoch:1,generation:1,scene:'journey-v1'});
+  assert.ok(JSON.stringify(guest.info).length<2048);
+  const room=new CoopRoom(f.state);
+  await send(room,guest,{type:'seen'});assert.equal(guest.messages.at(-1).type,'result');
+  await send(room,guest,{type:'seen'});assert.equal(guest.messages.at(-1).type,'transition');
+});
 test('campaign complete state has bounded geometry, stable unique IDs and no executable or remote resource fields',()=>{
   assert.equal(validView(campaign()),true);
   const mirrored=campaign();mirrored.world.draw[0][3]=4;assert.equal(validView(mirrored),true);

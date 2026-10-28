@@ -13,6 +13,8 @@ function fixture(guest = false, fetch = async () => {throw Error('Unexpected fet
   const elements = new Map(['coop_status','coop_lifetime','coop_panel','coop_create','coop_close','coop_link',
     'coop_level','coop_level_choice','coop_antarctica','coop_forest','coop_restart','coop_view_link','coop_invite','coop_manual','coop_invitation',
     'coop_share_status','coop_share','coop_copy','coop_join_form','coop_join_url','coop_join_invitation','coop_join_status','coop_diagnostics',
+    'coop_result','coop_result_title','coop_result_level','coop_result_status','coop_replay','coop_next','coop_result_end',
+    'coop_save_retry','coop_save_continue','coop_result_close',
     ...(guest ? ['guest_status','guest_lifetime','guest_join','guest_ack','guest_progress'] : [])]
     .map(id => [id, target({textContent: '',value:'',focus(){},select(){},removeAttribute(){}})]));
   const sockets = [];
@@ -47,6 +49,101 @@ test('host queue preserves taps and fails neutral on overflow', () => {
 
 const roomResponse = async () => ({ok:true,json:async()=>({room:'a'.repeat(32),guest:'b'.repeat(64),host:'d'.repeat(64),build:'c'.repeat(64)})});
 const identityResponse = async () => ({ok:true,text:async()=>'<script>window.SUPERTUX_DEPLOY_CONFIG = '+JSON.stringify({manifestSha256:'c'.repeat(64)})+';</script>'});
+
+async function completedHost({win=true,level=0,save=async()=>true}={}) {
+  const f=fixture(false,roomResponse),engine=f.window.Module.supertuxCoop;
+  f.window.supertux_saveFiles=save;
+  await f.elements.get('coop_create').fire('click');
+  const receive=value=>f.sockets[0].fire('message',{data:JSON.stringify(value)});
+  await receive({type:'ready'});await receive({type:'peer',connected:true,view:true});
+  engine.engineStatus(1,true,3,1);while(engine.poll()){}
+  assert.equal(engine.finished(10,2,win,level),true);
+  engine.engineStatus(1,false,4,0);
+  return {...f,engine,receive};
+}
+
+test('results wait for the native save and persistent flush; a double Next tap starts exactly one level',async()=>{
+  let finishSave,calls=0;
+  const f=await completedHost({save:()=>{++calls;return new Promise(resolve=>finishSave=resolve);}});
+  const {engine,elements}=f;
+  assert.equal(elements.get('coop_result').hidden,false);
+  await elements.get('coop_next').fire('click');assert.equal(engine.poll(),undefined);
+  engine.completionReady(10,1);assert.equal(calls,0);
+  engine.completionReady(10,2);engine.completionReady(10,2);
+  assert.equal(calls,1);assert.equal(elements.get('coop_next').disabled,true);
+  finishSave(true);await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(elements.get('coop_next').disabled,false);
+  await elements.get('coop_next').fire('click');await elements.get('coop_replay').fire('click');
+  assert.deepEqual(Array.from(engine.poll()),[6,3,10,2]);assert.equal(engine.poll(),undefined);
+  assert.deepEqual(f.sockets[0].sent.at(-1),{type:'transition',session:10,epoch:2,generation:4,scene:'journey-v1'});
+  assert.equal(engine.state.starting,true);
+  engine.view({session:11,scene:'journey-v1'});engine.engineStatus(1,true,5,1);
+  assert.equal(elements.get('coop_result').hidden,true);
+  assert.equal(engine.finished(10,2,true,0),false,'A retired completion cannot reopen the result screen');
+});
+
+test('failed saves require retry or an explicit visit-only choice, and stale save completion cannot revive a closed room',async()=>{
+  const f=await completedHost({save:async()=>false});
+  f.engine.completionReady(10,2);await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(f.elements.get('coop_next').disabled,true);
+  assert.equal(f.elements.get('coop_save_retry').hidden,false);
+  await f.elements.get('coop_next').fire('click');assert.equal(f.engine.poll(),undefined);
+  f.window.supertux_saveFiles=async()=>true;
+  await f.elements.get('coop_save_retry').fire('click');
+  assert.equal(f.elements.get('coop_next').disabled,false);
+  const visit=await completedHost({save:async()=>false});
+  visit.engine.completionReady(10,2);await new Promise(resolve=>setImmediate(resolve));
+  await visit.elements.get('coop_save_continue').fire('click');
+  await visit.elements.get('coop_replay').fire('click');
+  assert.deepEqual(Array.from(visit.engine.poll()),[6,0,10,2]);
+  let finishSave;
+  const closed=await completedHost({save:()=>new Promise(resolve=>finishSave=resolve)});
+  closed.engine.completionReady(10,2);await closed.elements.get('coop_close').fire('click');
+  finishSave(true);await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(closed.engine.state.lost,true);assert.equal(closed.elements.get('coop_result').hidden,true);
+});
+
+test('Next is unavailable after an abort or the last supported level; pause and disconnect cannot start a replay',async()=>{
+  for (const options of [{win:false},{level:3}]) {
+    const f=await completedHost(options);f.engine.completionReady(10,2);await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(f.elements.get('coop_next').hidden,true);
+    await f.elements.get('coop_next').fire('click');assert.equal(f.engine.poll(),undefined);
+    f.window.Module.supertuxShell.active=false;
+    await f.elements.get('coop_replay').fire('click');assert.equal(f.engine.poll(),undefined);
+    f.window.Module.supertuxShell.active=true;
+    await f.elements.get('coop_replay').fire('click');
+    assert.deepEqual(Array.from(f.engine.poll()),[6,options.level || 0,10,2]);
+    f.engine.transitionRejected(10,2);
+    assert.equal(f.engine.state.starting,false);
+    assert.equal(f.sockets[0].sent.at(-1).type,'result');
+    await f.elements.get('coop_close').fire('click');while(f.engine.poll()){}
+    await f.elements.get('coop_replay').fire('click');assert.equal(f.engine.poll(),undefined);
+  }
+});
+
+test('a pause or interruption before native polling cancels the pending transition and permits retry',async()=>{
+  for (const interruption of ['pause','relay']) {
+    const f=await completedHost();f.engine.completionReady(10,2);await new Promise(resolve=>setImmediate(resolve));
+    await f.elements.get('coop_next').fire('click');
+    assert.equal(f.engine.state.starting,true);
+    if (interruption==='pause') {
+      f.window.Module.supertuxShell.active=false;f.engine.onPause();
+    } else {
+      await f.receive({type:'connection',interrupted:true});
+    }
+    assert.equal(f.engine.state.starting,false);
+    assert.equal(f.engine.state.completion.transition,null);
+    assert.equal(f.sockets[0].sent.filter(p=>p.type==='result').length,2);
+    const pending=[];let command;while(command=f.engine.poll())pending.push(command[0]);
+    assert.ok(!pending.includes(6),'A retired selection cannot reach native code');
+    if(interruption==='relay')await f.receive({type:'connection',interrupted:false});
+    f.window.Module.supertuxShell.active=true;
+    // A native enabled receipt clears the recovery pause after trusted Resume.
+    f.engine.engineStatus(1,true,5,0);f.engine.engineStatus(1,false,6,0);
+    await f.elements.get('coop_next').fire('click');
+    assert.deepEqual(Array.from(f.engine.poll()),[6,3,10,2]);
+  }
+});
 
 test('authoritative room warnings are ordered, clear on a later deadline, and never change input', async () => {
   const f=fixture(true,identityResponse);await new Promise(resolve=>setImmediate(resolve));

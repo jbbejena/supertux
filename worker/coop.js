@@ -9,7 +9,7 @@ const UINT = value => Number.isInteger(value) && value > 0 && value < 0x80000000
 // a bounded recovery window, never an unbounded backlog or automatic resume.
 const STALE_MS = 2500, RECOVERY_MS = 15000;
 const idleLimit = info => info.role === 'host' && !info.session?.enabled ? RECOVERY_MS : STALE_MS;
-const FIELDS = {hello: ['type','protocol','build','view'], ping: ['type'], seen: ['type'], session: ['type','generation','enabled'], ack: ['type','sequence'], input: ['type','generation','sequence','mask'], 'view-ready':['type','session','epoch','generation'], result:['type','session','epoch','generation','win'], view: ['type','session','epoch','sequence','generation','time','scene','camera','players','world']};
+const FIELDS = {hello: ['type','protocol','build','view'], ping: ['type'], seen: ['type'], session: ['type','generation','enabled'], ack: ['type','sequence'], input: ['type','generation','sequence','mask'], 'view-ready':['type','session','epoch','generation'], result:['type','session','epoch','generation','win'], transition:['type','session','epoch','generation','scene'], view: ['type','session','epoch','sequence','generation','time','scene','camera','players','world']};
 const json = (body, status = 200) => new Response(JSON.stringify(body), {
   status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
 });
@@ -95,7 +95,7 @@ export class CoopRoom {
     if ((info.inFlight || 0) >= 32) {
       // These are latest-state notifications, never gameplay edges. Keep one
       // value per type while the receiver returns credit, not an event backlog.
-      if (['connection', 'session', 'lifetime', 'ack', 'pong', 'view', 'result'].includes(value.type)) {
+      if (['connection', 'session', 'lifetime', 'ack', 'pong', 'view', 'result', 'transition'].includes(value.type)) {
         info.pending ||= {};
         if (value.type === 'view') {
           // Cloudflare limits WebSocket attachments to 2 KiB. Large complete
@@ -115,7 +115,7 @@ export class CoopRoom {
     catch { try { socket.close(1011, 'Relay send failed'); } catch {} return false; }
   }
   flush_status(socket) {
-    for (const type of ['connection', 'session', 'lifetime', 'ack', 'pong', 'view', 'result']) {
+    for (const type of ['connection', 'session', 'lifetime', 'ack', 'pong', 'result', 'transition', 'view']) {
       const info = socket.deserializeAttachment();
       if ((info.inFlight || 0) >= 32) break;
       const marker = info.pending?.[type];
@@ -233,7 +233,9 @@ export class CoopRoom {
       if (message.generation === info.session?.generation && (!previous || message.session > previous.session ||
           (message.session === previous.session && (message.epoch > previous.epoch ||
           (message.epoch === previous.epoch && message.sequence > previous.sequence && message.time >= previous.time))))) {
-        info.viewOrder = {session:message.session,epoch:message.epoch,generation:message.generation,sequence:message.sequence,time:message.time};
+        info.viewOrder = {session:message.session,epoch:message.epoch,generation:message.generation,sequence:message.sequence,time:message.time,scene:message.scene};
+        if (info.result && (message.session > info.result.session ||
+            (message.session === info.result.session && message.epoch > info.result.epoch))) delete info.result;
         const peer = this.peer('guest');
         if (peer?.deserializeAttachment().hello && peer.deserializeAttachment().view) this.send(peer,message);
       }
@@ -243,7 +245,17 @@ export class CoopRoom {
     } else if (info.role === 'host' && message.type === 'result' && UINT(message.session) && UINT(message.epoch) &&
                message.generation === info.session?.generation && typeof message.win === 'boolean') {
       const order = info.viewOrder, peer = this.peer('guest');
-      if (order && order.session === message.session && order.epoch === message.epoch && peer?.deserializeAttachment().view) this.send(peer,message);
+      if (order && order.session === message.session && order.epoch === message.epoch && peer?.deserializeAttachment().view) {
+        info.result = {session:message.session,epoch:message.epoch,win:message.win,scene:order.scene};
+        this.send(peer,message);
+      }
+    } else if (info.role === 'host' && message.type === 'transition' && UINT(message.session) && UINT(message.epoch) &&
+               UINT(message.generation) && ['antarctica-v1','journey-v1'].includes(message.scene)) {
+      const result = info.result, peer = this.peer('guest');
+      if (result && result.session === message.session && result.epoch === message.epoch &&
+          message.generation === info.session?.generation && peer?.deserializeAttachment().view &&
+          (message.scene === result.scene || (result.win && result.scene === 'antarctica-v1' && message.scene === 'journey-v1')))
+        this.send(peer,message);
     } else if (info.role === 'host' && message.type === 'session' && UINT(message.generation) && typeof message.enabled === 'boolean') {
       info.session = {type: 'session', generation: message.generation, enabled: message.enabled};
       const peer = this.peer('guest');

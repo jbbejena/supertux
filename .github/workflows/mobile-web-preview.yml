@@ -33,20 +33,30 @@ jobs:
     name: Build playable mobile web preview
     runs-on: ubuntu-latest
     steps:
-    - name: Require an exact tested source for staging
+    - name: Require an exact source for staging
       if: inputs.publish_coop
       env:
         RUNTIME_REF: ${{ inputs.ref }}
         VALIDATION_RUN_ID: ${{ inputs.validation_run_id }}
       run: |
         [[ "$RUNTIME_REF" =~ ^[0-9a-f]{40}$ ]] || { echo '::error::Staging requires a complete source commit SHA.'; exit 1; }
-        [[ "$VALIDATION_RUN_ID" =~ ^[0-9]+$ ]] || { echo '::error::Staging requires an explicit successful validation run.'; exit 1; }
+        if [ -n "$VALIDATION_RUN_ID" ]; then
+          [[ "$VALIDATION_RUN_ID" =~ ^[1-9][0-9]*$ ]] || { echo '::error::Validation run ID must be a positive integer.'; exit 1; }
+        fi
     - name: Check out requested SuperTux ref
       uses: actions/checkout@v4
       with:
         ref: ${{ inputs.ref }}
         fetch-depth: 0
         submodules: recursive
+    - name: Require integrated source for private publication
+      if: inputs.publish_coop
+      env:
+        RUNTIME_REF: ${{ inputs.ref }}
+      run: |
+        test "$(git rev-parse HEAD)" = "$RUNTIME_REF"
+        git fetch --no-tags origin refs/heads/mobile-web-audit:refs/remotes/origin/mobile-web-audit
+        git merge-base --is-ancestor "$RUNTIME_REF" refs/remotes/origin/mobile-web-audit || { echo '::error::Private publication requires a commit already integrated into mobile-web-audit.'; exit 1; }
     - name: Reuse explicit validated Release artifact
       if: inputs.validation_run_id != ''
       env:
@@ -134,7 +144,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: tux
     steps:
-    - name: Check out the exact tested runtime
+    - name: Check out the exact requested runtime
       uses: actions/checkout@v4
       with:
         ref: ${{ inputs.ref }}
