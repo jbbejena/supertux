@@ -151,11 +151,13 @@ bool
 LevelsetScreen::start_coop_level(uint32_t session, uint32_t epoch, int level)
 {
   if (!m_coop_ready || session != m_coop_session || epoch != m_coop_epoch ||
-      m_basedir != "levels/world1" || (level != 0 && level != 3) ||
-      (level != m_coop_level && !(m_coop_win && m_coop_level == 0 && level == 3)))
+      m_basedir != "levels/world1" || (level != 0 && level != 3 && level != 4) ||
+      (level != m_coop_level && !(m_coop_win &&
+        ((m_coop_level == 0 && level == 3) || (m_coop_level == 3 && level == 4)))))
     return false;
 
-  const std::string filename = level == 3 ? "journey_begins.stl" : "welcome_antarctica.stl";
+  const std::string filename = level == 4 ? "somewhat_smaller_bath.stl" :
+    (level == 3 ? "journey_begins.stl" : "welcome_antarctica.stl");
   std::unique_ptr<GameSession> screen;
   try
   {

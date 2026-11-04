@@ -129,7 +129,7 @@ test('guest renders native faded colors once while texture and text keep their s
     fillText(){calls.push(['text',this.globalAlpha,this.fillStyle]);}};
   const canvas={width:844,height:390,style:{},getContext:()=>context};
   const bytes=Buffer.from('checked image'),url='coop-art/'+createHash('sha256').update(bytes).digest('hex')+'.png';
-  const scene=Buffer.from(JSON.stringify({schema:2,id:'coop-view-v1',tileImage:url,actions:{},campaigns:{'antarctica-v1':{textures:{'images/test.png':url},name:'Welcome to Antarctica'},'journey-v1':{textures:{'images/test.png':url},name:'The Journey Begins'}}}));
+  const scene=Buffer.from(JSON.stringify({schema:2,id:'coop-view-v1',tileImage:url,actions:{},campaigns:{'antarctica-v1':{textures:{'images/test.png':url},name:'Welcome to Antarctica'},'journey-v1':{textures:{'images/test.png':url},name:'The Journey Begins'},'bath-v1':{textures:{'images/test.png':url},name:'The Somewhat Smaller Bath'}}}));
   const entry=data=>({bytes:data.length,sha256:createHash('sha256').update(data).digest('hex')});
   const manifest=Buffer.from(JSON.stringify({frontend:{'coop-scene.json':entry(scene),[url]:entry(bytes)}}));
   const files=new Map([['manifest.json',manifest],['coop-scene.json',scene],[url,bytes]]);
@@ -160,8 +160,14 @@ test('guest renders native faded colors once while texture and text keep their s
   assert.equal(browser.SupertuxView.result({session:1,epoch:1,generation:1,win:true}),false);
   assert.equal(browser.SupertuxView.accept(frame(2,250,0,{session:1,generation:1,scene:'antarctica-v1',world:{draw:commands}})),false,'Retired first-level frames cannot replace the new level');
   assert.equal(browser.SupertuxView.result({session:2,epoch:1,generation:1,win:true}),true);
-  assert.equal(browser.SupertuxView.transition({session:2,epoch:1,generation:1,scene:'antarctica-v1'}),false,'The final supported level cannot advance to an unselected scene');
+  assert.equal(browser.SupertuxView.transition({session:2,epoch:1,generation:1,scene:'antarctica-v1'}),false,'A result cannot navigate backwards to an unselected scene');
   assert.equal(browser.SupertuxView.transition({session:2,epoch:1,generation:1,scene:'arbitrary'}),false);
+  assert.equal(browser.SupertuxView.transition({session:2,epoch:1,generation:1,scene:'bath-v1'}),true);
+  assert.equal(browser.SupertuxView.accept(frame(1,300,0,{session:3,generation:1,scene:'bath-v1',world:{draw:[]}})),true);
+  assert.equal(browser.SupertuxView.result({session:2,epoch:1,generation:1,win:true}),false);
+  assert.equal(browser.SupertuxView.result({session:3,epoch:1,generation:1,win:false}),true);
+  assert.equal(browser.SupertuxView.transition({session:3,epoch:1,generation:1,scene:'journey-v1'}),false);
+  assert.equal(browser.SupertuxView.transition({session:3,epoch:1,generation:1,scene:'bath-v1'}),true);
   assert.deepEqual(calls,[['texture',.2],['panel',1,'rgba(255,255,255,0.2)'],
     ['line',1,'rgba(255,255,255,0.25)'],['gradient',1],['text',.5,'rgba(255,255,255,0.4)']]);
 });

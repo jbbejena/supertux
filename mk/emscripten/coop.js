@@ -83,7 +83,8 @@
     const queue = [], status = document.getElementById('coop_status');
     const element = id => document.getElementById(id), diagnostics = new URLSearchParams(location.search).has('coop_debug');
     let supportsRooms = false, invitation = '', started = false, starting = false, completion = null, lastCompletionSession = 0;
-    const levels = {0:{name:'Welcome to Antarctica',scene:'antarctica-v1'},3:{name:'The Journey Begins',scene:'journey-v1'}};
+    const levels = {0:{name:'Welcome to Antarctica',scene:'antarctica-v1',next:3},
+      3:{name:'The Journey Begins',scene:'journey-v1',next:4},4:{name:'The Somewhat Smaller Bath',scene:'bath-v1'}};
     let relayInterrupted = false, lost = false, recoveryPaused = false, retiredGeneration = null, pauseGeneration = null, lastStall = 0, lastFrame = performance.now();
     let sceneDeadline = 0, sceneKey = null, sceneLoaded = null, connection, creating = false, createEpoch = 0, joinRejected = false, guestView = false, lastView = 0, state = {reserved: 0, enabled: false, generation: 0, sequence: 0}, lastSent = '';
     const say = text => { if (status && status.textContent !== text) status.textContent = text; };
@@ -108,9 +109,9 @@
       set('coop_result_level','textContent',levels[completion?.transition?.level ?? completion?.level]?.name || '');
       set('coop_result_status','textContent',completion?.message || '');
       set('coop_replay','disabled',!resultReady);
-      set('coop_next','hidden',!completion?.win || completion.level !== 0);
+      set('coop_next','hidden',!completion?.win || levels[completion.level]?.next === undefined);
       set('coop_next','disabled',!resultReady);
-      set('coop_result_end','hidden',starting || !completion?.win || completion.level !== 3);
+      set('coop_result_end','hidden',starting || !completion?.win || levels[completion.level]?.next !== undefined);
       set('coop_save_retry','hidden',!completion?.saveFailed || starting);
       set('coop_save_retry','disabled',!!completion?.saving);
       set('coop_save_continue','hidden',!completion?.saveFailed || starting);
@@ -235,7 +236,7 @@
         connection.send({...snapshot,generation:state.generation});
       },
       finished(session, epoch, win, level) {
-        if (!connection?.ready || !guestView || lost || ![0,3].includes(level) ||
+        if (!connection?.ready || !guestView || lost || !Object.hasOwn(levels,level) ||
             !Number.isInteger(session) || session<=lastCompletionSession || !Number.isInteger(epoch) || epoch<=0) return false;
         lastCompletionSession = session;
         completion = {session,epoch,win:!!win,level,nativeReady:false,saved:false,saving:false,saveFailed:false,message:'Saving your progress…'};
@@ -269,13 +270,13 @@
       result.message = saved ? 'Ready when you are. Player 2 stays in this room.' : 'Progress could not be saved. Retry, or keep playing for this visit.';
       render();
       if (module.supertuxShell?.active && !document.hidden)
-        element(saved ? (result.win && result.level===0 ? 'coop_next' : 'coop_replay') : 'coop_save_retry')?.focus?.();
+        element(saved ? (result.win && levels[result.level].next !== undefined ? 'coop_next' : 'coop_replay') : 'coop_save_retry')?.focus?.();
     }
     const playAgain = next => {
       const result = completion;
       if (!result?.nativeReady || !result.saved || result.saving || starting || !startReady() || recoveryPaused ||
-          !module.supertuxShell?.active || document.hidden || (next && (!result.win || result.level !== 0))) return;
-      const level = next ? 3 : result.level, scene = levels[level].scene;
+          !module.supertuxShell?.active || document.hidden || (next && (!result.win || levels[result.level].next === undefined))) return;
+      const level = next ? levels[result.level].next : result.level, scene = levels[level].scene;
       if (!connection.send({type:'transition',session:result.session,epoch:result.epoch,generation:state.generation,scene})) return;
       starting = true; result.transition = {scene,level}; result.message = `Loading ${levels[level].name}… Waiting for Player 2’s view.`;
       sceneKey = sceneLoaded = null; sceneDeadline = 0;
@@ -412,7 +413,7 @@
     document.getElementById('coop_antarctica')?.addEventListener('click', () => {
       if (!startReady() || starting || (!diagnostics && started) || !module.supertuxShell?.active) {say('Wait for Player 2 to be ready, then press Start together.');return;}
       const level = Number(element('coop_level')?.value || 0);
-      if (![0,3].includes(level)) {say('Choose one of the supported levels before starting.');return;}
+      if (!Object.hasOwn(levels,level)) {say('Choose one of the supported levels before starting.');return;}
       starting = true; say('Starting together. Waiting for Player 2’s scene…'); render();
       enqueue([5, level, 0, 0]);
       if (panel) panel.open = false;

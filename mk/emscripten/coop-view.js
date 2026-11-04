@@ -2,6 +2,7 @@
 (function (root) {
   'use strict';
   const distance = (x,y) => Math.hypot(x[0]-y[0],x[1]-y[1]);
+  const nextScene = {'antarctica-v1':'journey-v1', 'journey-v1':'bath-v1'};
   function continuous(a,b) {
     return a.generation===b.generation && a.camera[3]===b.camera[3] && a.camera[4]===b.camera[4] &&
       distance(a.camera,b.camera)<=128 && b.camera[2]/a.camera[2]>=.8 && b.camera[2]/a.camera[2]<=1.25 &&
@@ -352,8 +353,8 @@
     },
     transition(value) {
       const latest=buffer.order;
-      if (!outcome || !latest || !['antarctica-v1','journey-v1'].includes(value.scene) || value.generation!==generation || value.session!==outcome.session || value.epoch!==outcome.epoch ||
-          (value.scene!==latest.scene && !(outcome.win && latest.scene==='antarctica-v1' && value.scene==='journey-v1'))) return false;
+      if (!outcome || !latest || !['antarctica-v1','journey-v1','bath-v1'].includes(value.scene) || value.generation!==generation || value.session!==outcome.session || value.epoch!==outcome.epoch ||
+          (value.scene!==latest.scene && !(outcome.win && nextScene[latest.scene]===value.scene))) return false;
       transition=value;enabled=false;buffer.clear();freeze('Loading the host’s chosen level…');resultPanel();return true;
     },
     reset() {outcome=null;transition=null;readyKey=null;tintCache.clear();enabled = false; generation = 0; buffer.reset(); drawn = null; freeze('Waiting for the host.'); context.clearRect(0,0,canvas.width,canvas.height);resultPanel();},

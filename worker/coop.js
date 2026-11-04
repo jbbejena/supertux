@@ -5,6 +5,7 @@ export const PROTOCOL = 3;
 const TOKEN = /^[a-f0-9]{64}$/;
 const BUILD = /^[a-f0-9]{64}$/;
 const UINT = value => Number.isInteger(value) && value > 0 && value < 0x80000000;
+const NEXT_SCENE = {'antarctica-v1':'journey-v1', 'journey-v1':'bath-v1'};
 // A missed heartbeat freezes input first. Keep the authenticated sockets for
 // a bounded recovery window, never an unbounded backlog or automatic resume.
 const STALE_MS = 2500, RECOVERY_MS = 15000;
@@ -250,11 +251,11 @@ export class CoopRoom {
         this.send(peer,message);
       }
     } else if (info.role === 'host' && message.type === 'transition' && UINT(message.session) && UINT(message.epoch) &&
-               UINT(message.generation) && ['antarctica-v1','journey-v1'].includes(message.scene)) {
+               UINT(message.generation) && ['antarctica-v1','journey-v1','bath-v1'].includes(message.scene)) {
       const result = info.result, peer = this.peer('guest');
       if (result && result.session === message.session && result.epoch === message.epoch &&
           message.generation === info.session?.generation && peer?.deserializeAttachment().view &&
-          (message.scene === result.scene || (result.win && result.scene === 'antarctica-v1' && message.scene === 'journey-v1')))
+          (message.scene === result.scene || (result.win && NEXT_SCENE[result.scene] === message.scene)))
         this.send(peer,message);
     } else if (info.role === 'host' && message.type === 'session' && UINT(message.generation) && typeof message.enabled === 'boolean') {
       info.session = {type: 'session', generation: message.generation, enabled: message.enabled};

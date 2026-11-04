@@ -2,21 +2,23 @@
 
 The integrated baseline now includes The Journey Begins (PR #20) and fresh
 checkpoint teammate revival (PR #21). [Same-room Replay and Next level](PRIVATE_COOP_REPLAY.md)
-adds the next completion flow. Merging does not publish private staging;
+is merged in PR #22. The [third-level extension](PRIVATE_COOP_THIRD_LEVEL.md)
+adds The Somewhat Smaller Bath, its swimming interactions and Journey → Bath Next. Merging does not publish private staging;
 **Mobile Web Deploy updates only the single-player Worker**.
 
-After the Replay/Next PR merges, use Mobile Web Preview with the exact integrated
+After the third-level PR merges, use Mobile Web Preview with the exact integrated
 40-character source SHA and `publish_coop=true`. A fresh pinned Release build
 no longer requires a CI run. Validation workflows remain disabled at the user's
 request. The optional explicit artifact-reuse path still rejects mismatched or
 missing artifacts. [Publication commands and local tests](PRIVATE_COOP_REPLAY.md#preview-and-publication-without-ci)
 are the current procedure; older CI-dispatch instructions below are historical.
 Check the publication summary and hosted `BUILD_INFO.json` for the actual source.
-No new hosted or physical-device acceptance is claimed by the Replay/Next PR.
+No new hosted or physical-device acceptance is claimed by the third-level PR.
 
 On two physical phones, test both host/guest roles across separate networks:
 complete Welcome normally, Replay, complete it again, Next to Journey, activate a
-fresh checkpoint while a teammate is dead, and complete/replay Journey. Confirm
+fresh checkpoint while a teammate is dead, and complete/replay Journey. Next to Bath, check swimming directions/Jump, fish,
+moving coins, collapsing ice, checkpoint revival/restart and completion/Replay. Confirm
 neutral background/Resume, no Safari selection popup on Jump, one unchanged
 invitation, clear guest waiting/loading, and both earned completions after reload.
 Also verify a deliberate disconnect leaves a safe Close/Return-to-title path.

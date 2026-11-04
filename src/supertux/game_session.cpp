@@ -70,6 +70,7 @@ static int browser_coop_campaign(const std::string& path)
 {
   if (path == "levels/world1/welcome_antarctica.stl") return 2;
   if (path == "levels/world1/journey_begins.stl") return 3;
+  if (path == "levels/world1/somewhat_smaller_bath.stl") return 4;
   return 0;
 }
 EM_JS(int, browser_coop_wants_view, (), {
@@ -88,7 +89,7 @@ EM_JS(void, browser_coop_view, (uint32_t session, uint32_t epoch, uint32_t seque
   }
   if (Module.supertuxCoop) Module.supertuxCoop.view({type: 'view', session: session,
     epoch: epoch, sequence: sequence, time: performance.now(),
-    scene: supported === 3 ? 'journey-v1' : (supported === 2 ? 'antarctica-v1' : (supported ? 'coop-view-v1' : 'unsupported')),
+    scene: supported === 4 ? 'bath-v1' : (supported === 3 ? 'journey-v1' : (supported === 2 ? 'antarctica-v1' : (supported ? 'coop-view-v1' : 'unsupported'))),
     camera: f.slice(0,5), players: players, ...(supported >= 2 ? {world: JSON.parse(UTF8ToString(world))} : {})});
 });
 EM_JS(int, browser_coop_scene_ready, (uint32_t session, uint32_t epoch), {
@@ -967,8 +968,8 @@ GameSession::finish(bool win)
   m_end_seq_started = true;
 #ifdef __EMSCRIPTEN__
   const int coop_level = browser_coop_campaign(m_levelfile);
-  if (coop_level && LevelsetScreen::current() && browser_coop_finished(m_coop_session, m_coop_epoch, win, coop_level == 3 ? 3 : 0))
-    LevelsetScreen::current()->hold_coop_result(m_coop_session, m_coop_epoch, coop_level == 3 ? 3 : 0, win);
+  if (coop_level && LevelsetScreen::current() && browser_coop_finished(m_coop_session, m_coop_epoch, win, coop_level == 2 ? 0 : coop_level))
+    LevelsetScreen::current()->hold_coop_result(m_coop_session, m_coop_epoch, coop_level == 2 ? 0 : coop_level, win);
 #endif
 
   using namespace worldmap;

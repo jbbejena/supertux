@@ -30,6 +30,7 @@ class PackagingTests(unittest.TestCase):
             (source/'levels/world1').mkdir(parents=True)
             (source/'levels/world1/welcome_antarctica.stl').write_text('(supertux-level (sector (name "main") (tilemap (width 1) (height 1) (tiles 14))))')
             (source/'levels/world1/journey_begins.stl').write_text('(supertux-level (sector (name "main") (tilemap (width 1) (height 1) (tiles 14))))')
+            (source/'levels/world1/somewhat_smaller_bath.stl').write_text('(supertux-level (sector (name "main") (tilemap (width 1) (height 1) (tiles 14))))')
             (source/'images/tiles.strf').write_text('; tileset header comment\n(supertux-tiles (tiles (ids 14) (images "tiles/snow/convex.png")))')
             sha = 'a' * 40
             inventory = packaging.prepare(source,build/'web-assets',source_commit=sha,presentation=True)
@@ -107,6 +108,19 @@ class PackagingTests(unittest.TestCase):
                              'images/creatures/spiky/spiky_sleep-0.png'):
                 self.assertIn(required,journey['textures'])
             self.assertTrue(all(tile>=0 for tile in journey['tileIds']))
+            bath=scene['campaigns']['bath-v1']
+            self.assertEqual(bath['path'],'levels/world1/somewhat_smaller_bath.stl')
+            self.assertEqual(bath['objects']['fish-swimming'],5)
+            self.assertEqual(bath['objects']['fish-harmless'],6)
+            self.assertEqual(bath['objects']['captainsnowball'],4)
+            self.assertEqual(bath['objects']['unstable_tile'],10)
+            self.assertEqual(bath['objects']['path'],18)
+            for required in ('images/creatures/fish/ice/swim_blue-0.png',
+                             'images/creatures/fish/ice/swim_orange-0.png',
+                             'images/objects/unstable_tile/snow-11.png',
+                             'images/particles/air_bubble-0.png',
+                             'images/decal/explanations/billboard-swimming.png'):
+                self.assertIn(required,bath['textures'])
 
     def test_signatures_metadata_rollback_and_obsolete_inputs(self):
         with tempfile.TemporaryDirectory() as directory:

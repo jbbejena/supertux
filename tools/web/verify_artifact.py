@@ -58,7 +58,8 @@ def verify(directory, source_commit, configuration='Release'):
     assert scene['schema'] == 2 and scene['id'] == 'coop-view-v1', 'Presentation scene identity mismatch'
     urls = {scene['tileImage']} | {url for action in scene['actions'].values() for url in action['frames']}
     campaigns = {'antarctica-v1':'levels/world1/welcome_antarctica.stl',
-                 'journey-v1':'levels/world1/journey_begins.stl'}
+                 'journey-v1':'levels/world1/journey_begins.stl',
+                 'bath-v1':'levels/world1/somewhat_smaller_bath.stl'}
     assert set(scene['campaigns']) == set(campaigns), 'Campaign scene identity mismatch'
     for identity, path in campaigns.items():
         campaign = scene['campaigns'][identity]

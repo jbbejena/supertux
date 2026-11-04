@@ -300,6 +300,32 @@ test('result then transition survive backpressure and hibernation ahead of the n
   await send(room,guest,{type:'seen'});assert.equal(guest.messages.at(-1).type,'result');
   await send(room,guest,{type:'seen'});assert.equal(guest.messages.at(-1).type,'transition');
 });
+
+test('third-level transitions require the adjacent successful result; Bath can only replay',async()=>{
+  const f=fixture(),host=f.add('host'),guest=f.add('guest');await ready(f,host);
+  await send(f.object,guest,{type:'hello',protocol:PROTOCOL,build,view:true});
+  await send(f.object,host,{type:'session',generation:1,enabled:false});
+  await send(f.object,host,campaign());
+  const select=(scene,session=1)=>({type:'transition',session,epoch:1,generation:1,scene});
+  const result=(win,session=1)=>({type:'result',session,epoch:1,generation:1,win});
+  await send(f.object,host,result(true));
+  await send(f.object,host,select('bath-v1'));
+  assert.equal(guest.messages.some(p=>p.type==='transition'),false,'Welcome cannot skip Journey');
+  await send(f.object,host,campaign(1,{session:2,scene:'journey-v1'}));
+  await send(f.object,host,result(false,2));await send(f.object,host,select('bath-v1',2));
+  assert.equal(guest.messages.some(p=>p.type==='transition'),false,'An aborted Journey cannot advance');
+  await send(f.object,host,result(true,2));await send(f.object,host,select('bath-v1',2));
+  assert.equal(guest.messages.at(-1).scene,'bath-v1');
+  const bath=campaign(1,{session:3,scene:'bath-v1'});assert.equal(validView(bath),true);
+  await send(f.object,host,bath);await send(f.object,host,result(true,3));
+  const count=guest.messages.filter(p=>p.type==='transition').length;
+  for(const scene of ['antarctica-v1','journey-v1'])await send(f.object,host,select(scene,3));
+  assert.equal(guest.messages.filter(p=>p.type==='transition').length,count);
+  await send(f.object,host,select('bath-v1',3));assert.equal(guest.messages.at(-1).scene,'bath-v1');
+  await send(f.object,host,select('bath-v1',2));
+  assert.equal(guest.messages.filter(p=>p.type==='transition').length,count+1,'A retired result cannot change the third level');
+  await send(f.object,host,select('unknown',3));assert.equal(host.closed.code,1008);
+});
 test('campaign complete state has bounded geometry, stable unique IDs and no executable or remote resource fields',()=>{
   assert.equal(validView(campaign()),true);
   const mirrored=campaign();mirrored.world.draw[0][3]=4;assert.equal(validView(mirrored),true);

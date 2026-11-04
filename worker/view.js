@@ -4,10 +4,10 @@ const uid = x => Number.isInteger(x) && x > 0 && x <= 0xffffffff;
 const finite = (x, low, high) => typeof x === 'number' && Number.isFinite(x) && x >= low && x <= high;
 const exact = (x, keys) => x && typeof x === 'object' && !Array.isArray(x) && Object.keys(x).length === keys.length && keys.every(key => Object.hasOwn(x, key));
 export function validView(value) {
-  const campaign = ['antarctica-v1','journey-v1'].includes(value?.scene);
+  const campaign = ['antarctica-v1','journey-v1','bath-v1'].includes(value?.scene);
   if (!exact(value, ['type','session','epoch','sequence','generation','time','scene','camera','players',...(campaign ? ['world'] : [])]) || value.type !== 'view' ||
       !uint(value.session) || !uint(value.epoch) || !uint(value.sequence) || !uint(value.generation) || !finite(value.time, 0, 1e12) ||
-      !['coop-view-v1','antarctica-v1','journey-v1','unsupported'].includes(value.scene) || !Array.isArray(value.camera) || value.camera.length !== 5 ||
+      !['coop-view-v1','antarctica-v1','journey-v1','bath-v1','unsupported'].includes(value.scene) || !Array.isArray(value.camera) || value.camera.length !== 5 ||
       !value.camera.slice(0,2).every(x => finite(x,-100000,100000)) || !finite(value.camera[2],0.05,10) ||
       !value.camera.slice(3).every(x => Number.isInteger(x) && x >= 100 && x <= 8192) ||
       !Array.isArray(value.players) || value.players.length > 2) return false;

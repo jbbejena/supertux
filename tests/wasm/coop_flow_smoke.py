@@ -98,7 +98,7 @@ async def run(args, url):
             async def complete(scene, fail_save=False):
                 if fail_save:
                     await host.evaluate('window.flowSave=window.supertux_saveFiles;window.supertux_saveFiles=async()=>false')
-                x=11200 if scene=='journey-v1' else 8960
+                x={'antarctica-v1':8960,'journey-v1':11200,'bath-v1':12160}[scene]
                 await script(f'sector.Tux.set_is_intentionally_safe(true);sector.Tux2.set_is_intentionally_safe(true);sector.Tux.set_pos({x},600);sector.Tux2.set_pos({x},600);sector.Tux.set_velocity(0,0);sector.Tux2.set_velocity(0,0);')
                 await guest.wait_for_function('SupertuxView.state.outcome?.win===true',timeout=90000)
                 await host.wait_for_function('Module.supertuxCoop.state.completion?.nativeReady && !Module.supertuxCoop.state.completion.saving')
@@ -178,29 +178,35 @@ async def run(args, url):
             await transition('#coop_next','journey-v1')
             report['checks'].append('Next level advances Welcome to Antarctica to The Journey Begins with two native players and ordinary guest input')
             await complete('journey-v1')
+            assert await host.locator('#coop_next').is_visible()
+            await transition('#coop_replay','journey-v1')
+            await complete('journey-v1')
+            await transition('#coop_next','bath-v1')
+            report['checks'].append('Journey can Replay or advance to the original third campaign level in the same room, with fresh-session readiness and guest controls')
+            await complete('bath-v1')
             assert await host.locator('#coop_next').is_hidden()
             assert await host.locator('#coop_result_end').is_visible()
             await host.screenshot(path=str(args.output/'final-level-results.png'))
-            await transition('#coop_replay','journey-v1')
+            await transition('#coop_replay','bath-v1')
             report['checks'].append('The final supported level explains the preview boundary and can Replay without exposing an unsupported Next level')
 
             saved=await host.evaluate("Module.FS.readFile(Module.supertuxStorage.root+'profile1/world1.stsg',{encoding:'utf8'})")
             def earned(node,name):
                 return isinstance(node,list) and ((node and node[0]==name and ['solved','#t'] in node[1:]) or any(earned(child,name) for child in node))
-            assert all(earned(sexp(saved),name) for name in ('welcome_antarctica.stl','journey_begins.stl'))
+            assert all(earned(sexp(saved),name) for name in ('welcome_antarctica.stl','journey_begins.stl','somewhat_smaller_bath.stl'))
             assert len(room_requests)==1 and len(sockets)==2 and guest.url==invitation
             assert len([r for r in requests if '/coop-art/' in r])==artwork_requests
             assert not any(re.search(r'\.wasm(?:$|\?)|\.data(?:$|\?)|/music/|supertux2\.js',r) for r in requests)
             assert await guest.evaluate('indexedDB.databases().then(d=>d.length)')==0
-            assert len({s['session'] for s in report['sessions']})==4
-            report['checks'].append('All four sessions share one invitation and two sockets; guest reuses verified art, downloads no game/runtime/music package and owns no save database')
+            assert len({s['session'] for s in report['sessions']})==6
+            report['checks'].append('All six sessions share one invitation and two sockets; guest reuses verified art, downloads no game/runtime/music package and owns no save database')
             await host.locator('#coop_panel > summary').tap();await host.locator('#coop_close').tap()
             await host.wait_for_function('Module.supertuxCoop.state.lost && !Module.supertuxShell.active')
             await host.evaluate('window.flowReloadMarker=true')
             await host.locator('#coop_restart').tap()
             await host.wait_for_function('!window.flowReloadMarker && window.Module?.supertuxReady && Module.supertuxStorage.state==="indexeddb"',timeout=180000)
             assert await host.evaluate("Module.FS.readFile(Module.supertuxStorage.root+'profile1/world1.stsg',{encoding:'utf8'})")==saved
-            report['checks'].append('Both earned completion records survive Replay, Next level, room close and a real IndexedDB-backed reload')
+            report['checks'].append('All three earned completion records survive Replay, Next level, room close and a real IndexedDB-backed reload')
         except Exception as error:
             report['failure']=str(error)
             report['diagnostic']={'host':await host.evaluate('({state:Module?.supertuxCoop?.state,packet:window.flowPacket})'),
