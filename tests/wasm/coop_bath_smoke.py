@@ -62,11 +62,12 @@ async def run(args, url):
             await guest.evaluate('''() => {
               window.levelReady=SupertuxView.onReady;window.heldBaseline=null;
               SupertuxView.onReady=frame=>{heldBaseline=frame;};
-              window.levelTextures=new Set();window.levelBytes=0;
+              window.levelTextures=new Set();window.levelBytes=0;window.levelCompact=false;
               const accept=SupertuxView.accept;
               SupertuxView.accept=frame=>{
                 if(frame.scene==='bath-v1') {
                   levelBytes=Math.max(levelBytes,new TextEncoder().encode(JSON.stringify(frame)).length);
+                  levelCompact ||= frame.world.draw.some(c=>c[0]===0 && c[7].length===6);
                   for(const c of frame.world.draw)if(c[0]===0)levelTextures.add(c[7][0]);
                 }
                 return accept(frame);
@@ -196,6 +197,13 @@ async def run(args, url):
 
             await script('sector.Tux.set_ghost_mode(true);sector.Tux2.set_ghost_mode(true);')
             in_view='SupertuxView.state.drawn.players.every(p=>{const [x,y,s,w,h]=SupertuxView.state.drawn.camera;return (p.x-x)*s>-64 && (p.x-x)*s<w+64 && (p.y-y)*s>-64 && (p.y-y)*s<h+64;})'
+            await script('sector.Tux.set_pos(4416,864);sector.Tux2.set_pos(4416,1120);')
+            spread=await sample('vertical-spread',"SupertuxView.state.drawn.camera[2]<.8 && SupertuxView.state.drawn.players.every(p=>{const [x,y,s,w,h]=SupertuxView.state.drawn.camera;return (p.x-x)*s>=0 && (p.x+32-x)*s<=w && (p.y-y)*s>=0 && (p.y+32-y)*s<=h;})")
+            await host.wait_for_timeout(400)
+            assert await guest.evaluate("SupertuxView.playable && SupertuxView.state.latest.scene==='bath-v1'")
+            report['zoom_scale']=spread['camera'][2]
+            assert await guest.evaluate('levelCompact')
+            report['checks'].append('A 256-pixel vertical separation zooms the native shared camera below .8 while both players remain visible; lossless compact batches keep the scene within unchanged relay/quad bounds')
             for x,y in [(128,640),(1408,1024),(3840,864),(6400,640),(7808,288),(10496,640),(11840,640)]:
                 await script(f'sector.Tux.set_pos({x},{y});sector.Tux2.set_pos({x+160},{y});')
                 await sample('survey-'+str(x),f'Math.abs(SupertuxView.state.drawn.players[1].x-{x+160})<5 && '+in_view)
@@ -234,6 +242,7 @@ async def run(args, url):
             assert earned(sexp(saved))
             report['earned_level_solved']=True
             report['snapshot_bytes_max']=await guest.evaluate('levelBytes')
+            report['compact_batches_seen']=await guest.evaluate('levelCompact')
             assert report['snapshot_bytes_max']<=65536
             assert not any('Shared view artwork missing:' in line for line in logs)
             report['checks'].append('Original exit sequence completes Bath, saves its earned record and shows Replay/end-of-preview; all observed textures resolve within the 64 KiB snapshot bound')

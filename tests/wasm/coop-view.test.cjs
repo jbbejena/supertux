@@ -3,7 +3,20 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const {webcrypto, createHash} = require('node:crypto');
-const {SnapshotBuffer} = require('../../mk/emscripten/coop-view.js');
+const {SnapshotBuffer,expandView} = require('../../mk/emscripten/coop-view.js');
+
+test('compact texture batches expand losslessly once without mutating the wire frame',()=>{
+  const full=[0,17,50,4,.75,0,[0,0,844,390],['images/tile.png',32,64,
+    [[0,0,32,16,-12.25,42.31,24.75,12.38,90],[32,16,32,16,12.5,42.31,24.75,12.38,90],[0,0,16,16,1,2,3,4,0]],
+    [1,.5,.25,.8]],[20,30,.75]];
+  const wire={world:{draw:[[...full.slice(0,7),[full[7][0],32,64,
+    [[0,0,-12.25,42.31],[32,16,12.5,42.31],[0,0,16,16,1,2,3,4,0]],[1,.5,.25,.8],[32,16,24.75,12.38,90]],full[8]]],entities:[]}};
+  const original=structuredClone(wire),expanded=expandView(wire);
+  assert.deepEqual(expanded.world.draw,[full]);assert.deepEqual(wire,original);
+  assert.equal(expandView(expanded),expanded);
+  assert.ok(JSON.stringify(wire).length<JSON.stringify(expanded).length);
+  assert.deepEqual(expandView({scene:'unsupported'}),{scene:'unsupported'});
+});
 function frame(sequence,time,x,extra={}) {
   return {type:'view',session:1,epoch:1,sequence,time,scene:'coop-view-v1',camera:[x,0,1,844,390],
     players:[{id:1,x,y:20,dead:0,action:'small-stand-right',frame:0},{id:2,x:x+100,y:20,dead:0,action:'small-walk-right',frame:1}],...extra};
@@ -141,7 +154,7 @@ test('guest renders native faded colors once while texture and text keep their s
   await browser.SupertuxView.prepare({manifestUrl:'manifest.json',manifestSha256:entry(manifest).sha256});
   const clip=[0,0,844,390],white=[1,1,1,1];
   const commands=[
-    [0,1,1,0,.5,0,clip,['images/test.png',0,0,[[0,0,32,32,0,0,32,32,0]],[1,1,1,.4]]],
+    [0,1,1,0,.5,0,clip,['images/test.png',0,0,[[0,0,0,0]],[1,1,1,.4],[32,32,32,32,0]]],
     [2,1,2,0,.5,0,clip,[0,0,32,32,[1,1,1,.2],4]],
     [3,1,3,0,.5,0,clip,[0,0,32,32,[1,1,1,.25]]],
     [1,1,4,0,.5,0,clip,[0,0,32,32,white,white,0]],

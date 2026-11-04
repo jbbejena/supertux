@@ -339,6 +339,21 @@ test('campaign complete state has bounded geometry, stable unique IDs and no exe
   ]) {const frame=campaign();mutate(frame);assert.equal(validView(frame),false);}
   const bonus=campaign();bonus.players[0].action='big-walk-right';assert.equal(validView(bonus),true);
 });
+
+test('compact texture batches preserve the same logical-quad and numeric bounds',()=>{
+  const f=campaign(),p=f.world.draw[0][7];
+  p[3]=[[0,0,10,20]];p.push([32,32,32,32,0]);
+  p[3].push([0,0,16,16,12,24,8,8,90]);
+  assert.equal(validView(f),true);
+  for (const mutate of [
+    x=>x[5].pop(),x=>x[5][0]=-1,x=>x[5][4]=3601,x=>x[5][2]=NaN,
+    x=>x[3][0].push(0),x=>x[3][0][0]=-1,x=>x[3][0][2]=Infinity,
+  ]) {
+    const bad=structuredClone(f);mutate(bad.world.draw[0][7]);assert.equal(validView(bad),false);
+  }
+  p[3]=Array.from({length:2048},()=>[0,0,10,20]);assert.equal(validView(f),true);
+  p[3].push([0,0,10,20]);assert.equal(validView(f),false);
+});
 test('second campaign uses the same bounded world validation and retires prior level acknowledgments/results',async()=>{
   const journey=campaign(1,{scene:'journey-v1',session:2});
   assert.equal(validView(journey),true);

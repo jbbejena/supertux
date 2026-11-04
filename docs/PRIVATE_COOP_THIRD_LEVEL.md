@@ -81,6 +81,33 @@ checkpoint restart requires the new epoch. Relay messages retain the 64 KiB
 bound, bounded geometry/entities, two-client limit and hibernation/backpressure
 behavior. Protocol remains 3 and no bound or watchdog is relaxed.
 
+### Lossless batches for the zoomed camera
+
+The first Debug water run exposed a real size-limit failure: as Player 2 swam
+away, the camera zoomed to about 0.78 and the native complete draw exceeded its
+encoding budget. The host kept playing while the guest received `unsupported`.
+This was retained as failure evidence and fixed rather than bypassing the check.
+
+Texture batches can now factor shared geometry into an optional sixth payload
+field `[sourceWidth, sourceHeight, destinationWidth, destinationHeight, angle]`.
+Matching quads carry `[sourceX, sourceY, destinationX, destinationY]`; exceptional
+quads retain all nine values. The encoder requires at least three matching quads
+and compares their values using the existing coordinate quantization. The guest
+restores the original nine-number rectangles once, before painting or smoothing.
+Texture identities, positions, dimensions, angles, clipping, tint, alpha, layer
+order and original image bytes are preserved. This introduces no new message type.
+The optional format is protected by the same exact-build handshake.
+
+The Worker validates both forms and still counts every logical quad against
+2,048, with 256 commands and the unchanged 64 KiB message bound. No repeated-quad
+expansion or decompression multiplier is introduced. Native draw/world budgets
+also remain unchanged. Focused tests check exact expansion, mixed full/compact
+records, immutability, rendering, malformed dimensions/coordinates and the
+unchanged logical-quad ceiling. The compiled test includes a 256-pixel vertical
+separation and requires a zoomed scene with both living players fully visible.
+Extremely wide views remain subject to the existing presentation budgets; this
+is a bounded campaign preview, not an unbounded full-map display.
+
 ## Validation and limitations
 
 Focused tests check the actual source inventory/default sprites, missing or
@@ -98,7 +125,8 @@ progression after a real IndexedDB reload.
 in one room, including Replay of each level, no repeated artwork requests,
 late/stale identity rejection, delayed-baseline gates, save retry, the
 pause-before-poll race and all three solved flags after reload. Existing
-second-level and first-level suites remain available.
+second-level and first-level suites retain regression coverage for the shared
+encoder/renderer change.
 
 Local Release/Debug builds, Chromium/Linux WebKit browser evidence and native
 checks are recorded in the PR. Linux WebKit and mobile emulation are not actual

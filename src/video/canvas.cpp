@@ -491,8 +491,8 @@ Canvas::get_presentation()
     const DrawingRequest& request = *ptr;
     std::ostringstream payload;
     payload << std::setprecision(8);
-    const auto rect = [&payload](const Rectf& r) {
-      const auto coordinate = [](float value) { return static_cast<double>(std::round(value * 100.0f)) / 100.0; };
+    const auto coordinate = [](float value) { return static_cast<double>(std::round(value * 100.0f)) / 100.0; };
+    const auto rect = [&payload, &coordinate](const Rectf& r) {
       payload << coordinate(r.get_left()) << ',' << coordinate(r.get_top()) << ','
               << coordinate(r.get_width()) << ',' << coordinate(r.get_height());
     };
@@ -513,15 +513,41 @@ Canvas::get_presentation()
         if (arg.displacement_texture && !dynamic_cast<const SDLTexture*>(arg.texture)) { valid = false; return; }
         kind = 0;
         const Rect& region = std::get<1>(*key);
+        // Tile batches repeat dimensions/angles hundreds of times as the
+        // shared camera zooms out. Factor only identical serialized values;
+        // source/destination coordinates retain the existing precision.
+        const auto dimensions = [&](size_t i) {
+          return std::array<double, 5>{coordinate(arg.srcrects[i].get_width()),
+            coordinate(arg.srcrects[i].get_height()), coordinate(arg.dstrects[i].get_width()),
+            coordinate(arg.dstrects[i].get_height()), std::remainder(arg.angles[i], 360.0f)};
+        };
+        const auto common = !arg.srcrects.empty() ? dimensions(0) : std::array<double, 5>{};
+        size_t shared = 0;
+        for (size_t i = 0; i < arg.srcrects.size() && shared < 3; ++i)
+          if (dimensions(i) == common) ++shared;
+        const bool compact = shared >= 3;
         payload << '[' << presentation_quote(std::get<0>(*key)) << ',' << region.left << ',' << region.top << ",[";
         for (size_t i = 0; i < arg.srcrects.size(); ++i)
         {
           if (i) payload << ',';
-          payload << '['; rect(arg.srcrects[i]); payload << ',';
-          rect(arg.dstrects[i]); payload << ',' << std::remainder(arg.angles[i], 360.0f) << ']';
+          payload << '[';
+          if (compact && dimensions(i) == common)
+          {
+            payload << coordinate(arg.srcrects[i].get_left()) << ',' << coordinate(arg.srcrects[i].get_top()) << ','
+                    << coordinate(arg.dstrects[i].get_left()) << ',' << coordinate(arg.dstrects[i].get_top());
+          }
+          else
+          {
+            rect(arg.srcrects[i]); payload << ',';
+            rect(arg.dstrects[i]); payload << ',' << std::remainder(arg.angles[i], 360.0f);
+          }
+          payload << ']';
           if (++quads > 2048) { valid = false; break; }
         }
-        payload << "],"; color(arg.color); payload << ']';
+        payload << "],"; color(arg.color);
+        if (compact)
+          payload << ",[" << common[0] << ',' << common[1] << ',' << common[2] << ',' << common[3] << ',' << common[4] << ']';
+        payload << ']';
       }
       else if constexpr (std::is_same_v<T, GradientRequest>)
       {

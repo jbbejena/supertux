@@ -3,6 +3,19 @@
   'use strict';
   const distance = (x,y) => Math.hypot(x[0]-y[0],x[1]-y[1]);
   const nextScene = {'antarctica-v1':'journey-v1', 'journey-v1':'bath-v1'};
+  // The relay validates dimensions and the unchanged logical-quad budget.
+  // Normalize once, before rendering/interpolation; never mutate wire frames.
+  function expandView(frame) {
+    if (!frame.world) return frame;
+    let changed = false;
+    const draw = frame.world.draw.map(c => {
+      if (c[0] !== 0 || c[7].length !== 6) return c;
+      changed = true;
+      const p=c[7], [sw,sh,w,h,angle]=p[5];
+      return [...c.slice(0,7),[p[0],p[1],p[2],p[3].map(q=>q.length===4 ? [q[0],q[1],sw,sh,q[2],q[3],w,h,angle] : q),p[4]],...c.slice(8)];
+    });
+    return changed ? {...frame,world:{...frame.world,draw}} : frame;
+  }
   function continuous(a,b) {
     return a.generation===b.generation && a.camera[3]===b.camera[3] && a.camera[4]===b.camera[4] &&
       distance(a.camera,b.camera)<=128 && b.camera[2]/a.camera[2]>=.8 && b.camera[2]/a.camera[2]<=1.25 &&
@@ -138,7 +151,7 @@
         })};
     }
   }
-  if (typeof module !== 'undefined' && module.exports) {module.exports = {SnapshotBuffer}; return;}
+  if (typeof module !== 'undefined' && module.exports) {module.exports = {SnapshotBuffer,expandView}; return;}
   const canvas = document.getElementById('guest_canvas');
   if (!canvas) return;
   const context = canvas.getContext('2d'), status = document.getElementById('view_status'), buffer = new SnapshotBuffer();
@@ -331,6 +344,7 @@
       if (!frame || frame.generation!==generation) return false;
       if (outcome && frame.session<=outcome.session) return false;
       if (transition && (frame.session<=transition.session || frame.scene!==transition.scene)) return false;
+      frame = expandView(frame);
       if (scene?.campaigns[frame.scene] && frame.world) {
         // Preparation is exact-build checked before connecting. A complete
         // baseline acknowledgment is allowed during the engine loading gate.
