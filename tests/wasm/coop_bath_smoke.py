@@ -198,12 +198,12 @@ async def run(args, url):
             await script('sector.Tux.set_ghost_mode(true);sector.Tux2.set_ghost_mode(true);')
             in_view='SupertuxView.state.drawn.players.every(p=>{const [x,y,s,w,h]=SupertuxView.state.drawn.camera;return (p.x-x)*s>-64 && (p.x-x)*s<w+64 && (p.y-y)*s>-64 && (p.y-y)*s<h+64;})'
             await script('sector.Tux.set_pos(4416,864);sector.Tux2.set_pos(4416,1120);')
-            spread=await sample('vertical-spread',"SupertuxView.state.drawn.camera[2]<.8 && SupertuxView.state.drawn.players.every(p=>{const [x,y,s,w,h]=SupertuxView.state.drawn.camera;return (p.x-x)*s>=0 && (p.x+32-x)*s<=w && (p.y-y)*s>=0 && (p.y+32-y)*s<=h;})")
+            spread=await sample('vertical-spread',"SupertuxView.state.drawn.camera[2]<.72 && SupertuxView.state.drawn.players.every(p=>{const [x,y,s,w,h]=SupertuxView.state.drawn.camera;return (p.x-x)*s>=0 && (p.x+32-x)*s<=w && (p.y-y)*s>=0 && (p.y+32-y)*s<=h;})")
             await host.wait_for_timeout(400)
             assert await guest.evaluate("SupertuxView.playable && SupertuxView.state.latest.scene==='bath-v1'")
             report['zoom_scale']=spread['camera'][2]
             assert await guest.evaluate('levelCompact')
-            report['checks'].append('A 256-pixel vertical separation zooms the native shared camera below .8 while both players remain visible; lossless compact batches keep the scene within unchanged relay/quad bounds')
+            report['checks'].append('A 256-pixel vertical separation settles the native shared camera below .72 while both players remain visible; lossless compact batches keep the scene within unchanged relay/quad bounds')
             for x,y in [(128,640),(1408,1024),(3840,864),(6400,640),(7808,288),(10496,640),(11840,640)]:
                 await script(f'sector.Tux.set_pos({x},{y});sector.Tux2.set_pos({x+160},{y});')
                 await sample('survey-'+str(x),f'Math.abs(SupertuxView.state.drawn.players[1].x-{x+160})<5 && '+in_view)

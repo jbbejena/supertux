@@ -90,13 +90,19 @@ This was retained as failure evidence and fixed rather than bypassing the check.
 
 Texture batches can now factor shared geometry into an optional sixth payload
 field `[sourceWidth, sourceHeight, destinationWidth, destinationHeight, angle]`.
-Matching quads carry `[sourceX, sourceY, destinationX, destinationY]`; exceptional
-quads retain all nine values. The encoder requires at least three matching quads
-and compares their values using the existing coordinate quantization. The guest
+An optional pair of shared source coordinates follows those dimensions. Matching
+quads then carry only `[destinationX, destinationY]`; other source coordinates
+use four values, and exceptional geometry retains all nine values. The encoder selects the most frequent matching values, requires at least three
+matches, and uses the existing coordinate quantization. The guest
 restores the original nine-number rectangles once, before painting or smoothing.
 Texture identities, positions, dimensions, angles, clipping, tint, alpha, layer
 order and original image bytes are preserved. This introduces no new message type.
-The optional format is protected by the same exact-build handshake.
+The optional format is protected by the same exact-build handshake. Wholly
+clipped, unrotated texture rectangles are omitted before encoding, with a
+one-pixel edge guard; partially visible and rotated rectangles are retained.
+This mirrors clipping without discarding visible pixels. The settled WebKit zoom
+regression showed that sharing source coordinates was also necessary to stay
+within the original encoded-draw budget.
 
 The Worker validates both forms and still counts every logical quad against
 2,048, with 256 commands and the unchanged 64 KiB message bound. No repeated-quad
@@ -104,7 +110,8 @@ expansion or decompression multiplier is introduced. Native draw/world budgets
 also remain unchanged. Focused tests check exact expansion, mixed full/compact
 records, immutability, rendering, malformed dimensions/coordinates and the
 unchanged logical-quad ceiling. The compiled test includes a 256-pixel vertical
-separation and requires a zoomed scene with both living players fully visible.
+separation, waits for the camera to settle below 0.72, and requires both living
+players fully visible while the scene remains playable.
 Extremely wide views remain subject to the existing presentation budgets; this
 is a bounded campaign preview, not an unbounded full-map display.
 

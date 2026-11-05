@@ -54,11 +54,13 @@ function validWorld(world) {
       if ((!compact && p.length!==5) || typeof p[0]!=='string' || p[0].length>180 || !/^\/?images\/[a-zA-Z0-9_./ -]+\.png$/.test(p[0]) || p[0].includes('..') ||
           !Number.isInteger(p[1]) || !Number.isInteger(p[2]) || p[1]<0 || p[2]<0 || p[1]>16384 || p[2]>16384 ||
           !Array.isArray(p[3]) || !rgba(p[4])) return false;
-      if (compact && (!numbers(p[5],5) || p[5].slice(0,4).some(x=>x<0) || Math.abs(p[5][4])>3600)) return false;
+      if (compact && (!Array.isArray(p[5]) || ![5,7].includes(p[5].length) || !numbers(p[5],p[5].length) ||
+          p[5].slice(0,4).some(x=>x<0) || Math.abs(p[5][4])>3600 || p[5].slice(5).some(x=>x<0))) return false;
       for (const r of p[3]) {
+        const positionOnly=compact && p[5].length===7 && Array.isArray(r) && r.length===2;
         const shortQuad=compact && Array.isArray(r) && r.length===4;
-        if (++quads>2048 || !numbers(r,shortQuad?4:9) ||
-            (shortQuad ? r[0]<0 || r[1]<0 : r.slice(0,4).some(x=>x<0) || r[6]<0 || r[7]<0 || Math.abs(r[8])>3600)) return false;
+        if (++quads>2048 || !numbers(r,positionOnly?2:shortQuad?4:9) ||
+            (!positionOnly && (shortQuad ? r[0]<0 || r[1]<0 : r.slice(0,4).some(x=>x<0) || r[6]<0 || r[7]<0 || Math.abs(r[8])>3600))) return false;
       }
     } else if (c[0]===1) {
       if (p.length!==7 || !numbers(p.slice(0,4),4) || !rgba(p[4]) || !rgba(p[5]) || ![0,1,2,3].includes(p[6])) return false;

@@ -347,12 +347,14 @@ test('compact texture batches preserve the same logical-quad and numeric bounds'
   assert.equal(validView(f),true);
   for (const mutate of [
     x=>x[5].pop(),x=>x[5][0]=-1,x=>x[5][4]=3601,x=>x[5][2]=NaN,
-    x=>x[3][0].push(0),x=>x[3][0][0]=-1,x=>x[3][0][2]=Infinity,
+    x=>x[3][0].push(0),x=>x[3][0][0]=-1,x=>x[3][0][2]=Infinity,x=>x[3][0]=[10,20],
   ]) {
     const bad=structuredClone(f);mutate(bad.world.draw[0][7]);assert.equal(validView(bad),false);
   }
-  p[3]=Array.from({length:2048},()=>[0,0,10,20]);assert.equal(validView(f),true);
-  p[3].push([0,0,10,20]);assert.equal(validView(f),false);
+  p[5].push(0,0);p[3][0]=[10,20];assert.equal(validView(f),true);
+  const bad=structuredClone(f);bad.world.draw[0][7][5][5]=-1;assert.equal(validView(bad),false);
+  p[3]=Array.from({length:2048},()=>[10,20]);assert.equal(validView(f),true);
+  p[3].push([10,20]);assert.equal(validView(f),false);
 });
 test('second campaign uses the same bounded world validation and retires prior level acknowledgments/results',async()=>{
   const journey=campaign(1,{scene:'journey-v1',session:2});

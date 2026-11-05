@@ -11,8 +11,9 @@
     const draw = frame.world.draw.map(c => {
       if (c[0] !== 0 || c[7].length !== 6) return c;
       changed = true;
-      const p=c[7], [sw,sh,w,h,angle]=p[5];
-      return [...c.slice(0,7),[p[0],p[1],p[2],p[3].map(q=>q.length===4 ? [q[0],q[1],sw,sh,q[2],q[3],w,h,angle] : q),p[4]],...c.slice(8)];
+      const p=c[7], [sw,sh,w,h,angle,sx,sy]=p[5];
+      return [...c.slice(0,7),[p[0],p[1],p[2],p[3].map(q=>q.length===2 ? [sx,sy,sw,sh,q[0],q[1],w,h,angle] :
+        q.length===4 ? [q[0],q[1],sw,sh,q[2],q[3],w,h,angle] : q),p[4]],...c.slice(8)];
     });
     return changed ? {...frame,world:{...frame.world,draw}} : frame;
   }

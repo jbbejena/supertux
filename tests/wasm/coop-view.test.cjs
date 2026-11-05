@@ -15,6 +15,10 @@ test('compact texture batches expand losslessly once without mutating the wire f
   assert.deepEqual(expanded.world.draw,[full]);assert.deepEqual(wire,original);
   assert.equal(expandView(expanded),expanded);
   assert.ok(JSON.stringify(wire).length<JSON.stringify(expanded).length);
+  const origin=structuredClone(wire);
+  origin.world.draw[0][7][5].push(0,0);
+  origin.world.draw[0][7][3][0]=[-12.25,42.31];
+  assert.deepEqual(expandView(origin).world.draw,[full]);
   assert.deepEqual(expandView({scene:'unsupported'}),{scene:'unsupported'});
 });
 function frame(sequence,time,x,extra={}) {
@@ -154,7 +158,7 @@ test('guest renders native faded colors once while texture and text keep their s
   await browser.SupertuxView.prepare({manifestUrl:'manifest.json',manifestSha256:entry(manifest).sha256});
   const clip=[0,0,844,390],white=[1,1,1,1];
   const commands=[
-    [0,1,1,0,.5,0,clip,['images/test.png',0,0,[[0,0,0,0]],[1,1,1,.4],[32,32,32,32,0]]],
+    [0,1,1,0,.5,0,clip,['images/test.png',0,0,[[0,0]],[1,1,1,.4],[32,32,32,32,0,0,0]]],
     [2,1,2,0,.5,0,clip,[0,0,32,32,[1,1,1,.2],4]],
     [3,1,3,0,.5,0,clip,[0,0,32,32,[1,1,1,.25]]],
     [1,1,4,0,.5,0,clip,[0,0,32,32,white,white,0]],

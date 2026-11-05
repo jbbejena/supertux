@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <map>
 
 #include "supertux/globals.hpp"
 #include "supertux/gameconfig.hpp"
@@ -513,6 +514,24 @@ Canvas::get_presentation()
         if (arg.displacement_texture && !dynamic_cast<const SDLTexture*>(arg.texture)) { valid = false; return; }
         kind = 0;
         const Rect& region = std::get<1>(*key);
+        // SDL clips these rectangles as it paints. Avoid spending the shared
+        // baseline budget on wholly invisible quads; retain rotated geometry
+        // and a one-pixel guard around the quantized destination/clip edges.
+        std::vector<size_t> visible;
+        visible.reserve(arg.srcrects.size());
+        const Rect& clip = request.viewport;
+        for (size_t i = 0; i < arg.srcrects.size(); ++i)
+        {
+          const auto& dst = arg.dstrects[i];
+          const double x = coordinate(dst.get_left()), y = coordinate(dst.get_top());
+          const double w = coordinate(dst.get_width()), h = coordinate(dst.get_height());
+          if (std::remainder(arg.angles[i], 360.0f) == 0.f &&
+              (x + w < clip.left - 1.0 || y + h < clip.top - 1.0 ||
+               x > clip.right + 1.0 || y > clip.bottom + 1.0))
+            continue;
+          visible.push_back(i);
+        }
+        if (visible.empty()) { kind = -1; return; }
         // Tile batches repeat dimensions/angles hundreds of times as the
         // shared camera zooms out. Factor only identical serialized values;
         // source/destination coordinates retain the existing precision.
@@ -521,20 +540,43 @@ Canvas::get_presentation()
             coordinate(arg.srcrects[i].get_height()), coordinate(arg.dstrects[i].get_width()),
             coordinate(arg.dstrects[i].get_height()), std::remainder(arg.angles[i], 360.0f)};
         };
-        const auto common = !arg.srcrects.empty() ? dimensions(0) : std::array<double, 5>{};
-        size_t shared = 0;
-        for (size_t i = 0; i < arg.srcrects.size() && shared < 3; ++i)
-          if (dimensions(i) == common) ++shared;
-        const bool compact = shared >= 3;
-        payload << '[' << presentation_quote(std::get<0>(*key)) << ',' << region.left << ',' << region.top << ",[";
-        for (size_t i = 0; i < arg.srcrects.size(); ++i)
+        auto common = dimensions(visible.front());
+        std::array<double, 2> origin{};
+        size_t shared = 0, shared_origin = 0;
+        if (visible.size() >= 3)
         {
-          if (i) payload << ',';
+          std::map<std::array<double, 5>, size_t> dimension_counts;
+          std::map<std::array<double, 7>, size_t> source_counts;
+          for (const size_t i : visible)
+          {
+            const auto d = dimensions(i);
+            ++dimension_counts[d];
+            ++source_counts[{d[0],d[1],d[2],d[3],d[4],
+              coordinate(arg.srcrects[i].get_left()), coordinate(arg.srcrects[i].get_top())}];
+          }
+          for (const auto& entry : dimension_counts)
+            if (entry.second > shared) { common = entry.first; shared = entry.second; }
+          for (const auto& entry : source_counts)
+            if (std::equal(common.begin(), common.end(), entry.first.begin()) && entry.second > shared_origin)
+            {
+              origin = {entry.first[5], entry.first[6]};
+              shared_origin = entry.second;
+            }
+        }
+        const bool compact = shared >= 3;
+        const bool common_origin = compact && shared_origin >= 3;
+        payload << '[' << presentation_quote(std::get<0>(*key)) << ',' << region.left << ',' << region.top << ",[";
+        for (size_t slot = 0; slot < visible.size(); ++slot)
+        {
+          const size_t i = visible[slot];
+          if (slot) payload << ',';
           payload << '[';
           if (compact && dimensions(i) == common)
           {
-            payload << coordinate(arg.srcrects[i].get_left()) << ',' << coordinate(arg.srcrects[i].get_top()) << ','
-                    << coordinate(arg.dstrects[i].get_left()) << ',' << coordinate(arg.dstrects[i].get_top());
+            if (!common_origin || coordinate(arg.srcrects[i].get_left()) != origin[0] ||
+                coordinate(arg.srcrects[i].get_top()) != origin[1])
+              payload << coordinate(arg.srcrects[i].get_left()) << ',' << coordinate(arg.srcrects[i].get_top()) << ',';
+            payload << coordinate(arg.dstrects[i].get_left()) << ',' << coordinate(arg.dstrects[i].get_top());
           }
           else
           {
@@ -546,7 +588,11 @@ Canvas::get_presentation()
         }
         payload << "],"; color(arg.color);
         if (compact)
-          payload << ",[" << common[0] << ',' << common[1] << ',' << common[2] << ',' << common[3] << ',' << common[4] << ']';
+        {
+          payload << ",[" << common[0] << ',' << common[1] << ',' << common[2] << ',' << common[3] << ',' << common[4];
+          if (common_origin) payload << ',' << origin[0] << ',' << origin[1];
+          payload << ']';
+        }
         payload << ']';
       }
       else if constexpr (std::is_same_v<T, GradientRequest>)
