@@ -4,10 +4,10 @@ const uid = x => Number.isInteger(x) && x > 0 && x <= 0xffffffff;
 const finite = (x, low, high) => typeof x === 'number' && Number.isFinite(x) && x >= low && x <= high;
 const exact = (x, keys) => x && typeof x === 'object' && !Array.isArray(x) && Object.keys(x).length === keys.length && keys.every(key => Object.hasOwn(x, key));
 export function validView(value) {
-  const campaign = ['antarctica-v1','journey-v1'].includes(value?.scene);
+  const campaign = ['antarctica-v1','journey-v1','bath-v1'].includes(value?.scene);
   if (!exact(value, ['type','session','epoch','sequence','generation','time','scene','camera','players',...(campaign ? ['world'] : [])]) || value.type !== 'view' ||
       !uint(value.session) || !uint(value.epoch) || !uint(value.sequence) || !uint(value.generation) || !finite(value.time, 0, 1e12) ||
-      !['coop-view-v1','antarctica-v1','journey-v1','unsupported'].includes(value.scene) || !Array.isArray(value.camera) || value.camera.length !== 5 ||
+      !['coop-view-v1','antarctica-v1','journey-v1','bath-v1','unsupported'].includes(value.scene) || !Array.isArray(value.camera) || value.camera.length !== 5 ||
       !value.camera.slice(0,2).every(x => finite(x,-100000,100000)) || !finite(value.camera[2],0.05,10) ||
       !value.camera.slice(3).every(x => Number.isInteger(x) && x >= 100 && x <= 8192) ||
       !Array.isArray(value.players) || value.players.length > 2) return false;
@@ -50,11 +50,17 @@ function validWorld(world) {
     if (c.length===9 && (!numbers(c[8],3,-1000000,1000000) || !finite(c[8][2],.0001,100))) return false;
     const p=c[7];
     if (c[0]===0) {
-      if (p.length!==5 || typeof p[0]!=='string' || p[0].length>180 || !/^\/?images\/[a-zA-Z0-9_./ -]+\.png$/.test(p[0]) || p[0].includes('..') ||
+      const compact=p.length===6;
+      if ((!compact && p.length!==5) || typeof p[0]!=='string' || p[0].length>180 || !/^\/?images\/[a-zA-Z0-9_./ -]+\.png$/.test(p[0]) || p[0].includes('..') ||
           !Number.isInteger(p[1]) || !Number.isInteger(p[2]) || p[1]<0 || p[2]<0 || p[1]>16384 || p[2]>16384 ||
           !Array.isArray(p[3]) || !rgba(p[4])) return false;
+      if (compact && (!Array.isArray(p[5]) || ![5,7].includes(p[5].length) || !numbers(p[5],p[5].length) ||
+          p[5].slice(0,4).some(x=>x<0) || Math.abs(p[5][4])>3600 || p[5].slice(5).some(x=>x<0))) return false;
       for (const r of p[3]) {
-        if (++quads>2048 || !numbers(r,9) || r.slice(0,4).some(x=>x<0) || r[6]<0 || r[7]<0 || Math.abs(r[8])>3600) return false;
+        const positionOnly=compact && p[5].length===7 && Array.isArray(r) && r.length===2;
+        const shortQuad=compact && Array.isArray(r) && r.length===4;
+        if (++quads>2048 || !numbers(r,positionOnly?2:shortQuad?4:9) ||
+            (!positionOnly && (shortQuad ? r[0]<0 || r[1]<0 : r.slice(0,4).some(x=>x<0) || r[6]<0 || r[7]<0 || Math.abs(r[8])>3600))) return false;
       }
     } else if (c[0]===1) {
       if (p.length!==7 || !numbers(p.slice(0,4),4) || !rgba(p[4]) || !rgba(p[5]) || ![0,1,2,3].includes(p[6])) return false;

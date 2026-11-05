@@ -89,6 +89,8 @@ def derive(source, output, write, encoded):
     for identity, filename, name, extra_folders in (
         ('antarctica-v1', 'welcome_antarctica.stl', 'Welcome to Antarctica', []),
         ('journey-v1', 'journey_begins.stl', 'The Journey Begins', ['creatures/spiky']),
+        ('bath-v1', 'somewhat_smaller_bath.stl', 'The Somewhat Smaller Bath',
+         ['creatures/fish/ice', 'objects/unstable_tile']),
     ):
         level_source = source / 'levels/world1' / filename
         parsed_level = sexp(level_source.read_text())

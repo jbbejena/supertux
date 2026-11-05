@@ -3,7 +3,24 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const {webcrypto, createHash} = require('node:crypto');
-const {SnapshotBuffer} = require('../../mk/emscripten/coop-view.js');
+const {SnapshotBuffer,expandView} = require('../../mk/emscripten/coop-view.js');
+
+test('compact texture batches expand losslessly once without mutating the wire frame',()=>{
+  const full=[0,17,50,4,.75,0,[0,0,844,390],['images/tile.png',32,64,
+    [[0,0,32,16,-12.25,42.31,24.75,12.38,90],[32,16,32,16,12.5,42.31,24.75,12.38,90],[0,0,16,16,1,2,3,4,0]],
+    [1,.5,.25,.8]],[20,30,.75]];
+  const wire={world:{draw:[[...full.slice(0,7),[full[7][0],32,64,
+    [[0,0,-12.25,42.31],[32,16,12.5,42.31],[0,0,16,16,1,2,3,4,0]],[1,.5,.25,.8],[32,16,24.75,12.38,90]],full[8]]],entities:[]}};
+  const original=structuredClone(wire),expanded=expandView(wire);
+  assert.deepEqual(expanded.world.draw,[full]);assert.deepEqual(wire,original);
+  assert.equal(expandView(expanded),expanded);
+  assert.ok(JSON.stringify(wire).length<JSON.stringify(expanded).length);
+  const origin=structuredClone(wire);
+  origin.world.draw[0][7][5].push(0,0);
+  origin.world.draw[0][7][3][0]=[-12.25,42.31];
+  assert.deepEqual(expandView(origin).world.draw,[full]);
+  assert.deepEqual(expandView({scene:'unsupported'}),{scene:'unsupported'});
+});
 function frame(sequence,time,x,extra={}) {
   return {type:'view',session:1,epoch:1,sequence,time,scene:'coop-view-v1',camera:[x,0,1,844,390],
     players:[{id:1,x,y:20,dead:0,action:'small-stand-right',frame:0},{id:2,x:x+100,y:20,dead:0,action:'small-walk-right',frame:1}],...extra};
@@ -129,7 +146,7 @@ test('guest renders native faded colors once while texture and text keep their s
     fillText(){calls.push(['text',this.globalAlpha,this.fillStyle]);}};
   const canvas={width:844,height:390,style:{},getContext:()=>context};
   const bytes=Buffer.from('checked image'),url='coop-art/'+createHash('sha256').update(bytes).digest('hex')+'.png';
-  const scene=Buffer.from(JSON.stringify({schema:2,id:'coop-view-v1',tileImage:url,actions:{},campaigns:{'antarctica-v1':{textures:{'images/test.png':url},name:'Welcome to Antarctica'},'journey-v1':{textures:{'images/test.png':url},name:'The Journey Begins'}}}));
+  const scene=Buffer.from(JSON.stringify({schema:2,id:'coop-view-v1',tileImage:url,actions:{},campaigns:{'antarctica-v1':{textures:{'images/test.png':url},name:'Welcome to Antarctica'},'journey-v1':{textures:{'images/test.png':url},name:'The Journey Begins'},'bath-v1':{textures:{'images/test.png':url},name:'The Somewhat Smaller Bath'}}}));
   const entry=data=>({bytes:data.length,sha256:createHash('sha256').update(data).digest('hex')});
   const manifest=Buffer.from(JSON.stringify({frontend:{'coop-scene.json':entry(scene),[url]:entry(bytes)}}));
   const files=new Map([['manifest.json',manifest],['coop-scene.json',scene],[url,bytes]]);
@@ -141,7 +158,7 @@ test('guest renders native faded colors once while texture and text keep their s
   await browser.SupertuxView.prepare({manifestUrl:'manifest.json',manifestSha256:entry(manifest).sha256});
   const clip=[0,0,844,390],white=[1,1,1,1];
   const commands=[
-    [0,1,1,0,.5,0,clip,['images/test.png',0,0,[[0,0,32,32,0,0,32,32,0]],[1,1,1,.4]]],
+    [0,1,1,0,.5,0,clip,['images/test.png',0,0,[[0,0]],[1,1,1,.4],[32,32,32,32,0,0,0]]],
     [2,1,2,0,.5,0,clip,[0,0,32,32,[1,1,1,.2],4]],
     [3,1,3,0,.5,0,clip,[0,0,32,32,[1,1,1,.25]]],
     [1,1,4,0,.5,0,clip,[0,0,32,32,white,white,0]],
@@ -160,8 +177,14 @@ test('guest renders native faded colors once while texture and text keep their s
   assert.equal(browser.SupertuxView.result({session:1,epoch:1,generation:1,win:true}),false);
   assert.equal(browser.SupertuxView.accept(frame(2,250,0,{session:1,generation:1,scene:'antarctica-v1',world:{draw:commands}})),false,'Retired first-level frames cannot replace the new level');
   assert.equal(browser.SupertuxView.result({session:2,epoch:1,generation:1,win:true}),true);
-  assert.equal(browser.SupertuxView.transition({session:2,epoch:1,generation:1,scene:'antarctica-v1'}),false,'The final supported level cannot advance to an unselected scene');
+  assert.equal(browser.SupertuxView.transition({session:2,epoch:1,generation:1,scene:'antarctica-v1'}),false,'A result cannot navigate backwards to an unselected scene');
   assert.equal(browser.SupertuxView.transition({session:2,epoch:1,generation:1,scene:'arbitrary'}),false);
+  assert.equal(browser.SupertuxView.transition({session:2,epoch:1,generation:1,scene:'bath-v1'}),true);
+  assert.equal(browser.SupertuxView.accept(frame(1,300,0,{session:3,generation:1,scene:'bath-v1',world:{draw:[]}})),true);
+  assert.equal(browser.SupertuxView.result({session:2,epoch:1,generation:1,win:true}),false);
+  assert.equal(browser.SupertuxView.result({session:3,epoch:1,generation:1,win:false}),true);
+  assert.equal(browser.SupertuxView.transition({session:3,epoch:1,generation:1,scene:'journey-v1'}),false);
+  assert.equal(browser.SupertuxView.transition({session:3,epoch:1,generation:1,scene:'bath-v1'}),true);
   assert.deepEqual(calls,[['texture',.2],['panel',1,'rgba(255,255,255,0.2)'],
     ['line',1,'rgba(255,255,255,0.25)'],['gradient',1],['text',.5,'rgba(255,255,255,0.4)']]);
 });

@@ -32,12 +32,11 @@ soundtrack or campaign-save database.
 
 After a shared-view guest joins and the native engine reserves Player 2, the
 host sees **Player 2 ready** and **Start together** becomes available. That button
-starts the original selected level and collapses the panel. The second-level
-candidate adds a **Level** selector with **Welcome to Antarctica** (default) and
-**The Journey Begins**, as described in
-[PRIVATE_COOP_SECOND_LEVEL.md](PRIVATE_COOP_SECOND_LEVEL.md). Choose before
-starting; after completion, Replay or successful first-to-second-level Next
-keeps the same room and invitation. Arbitrary reselection uses the title/fresh-room flow. The
+starts the original selected level and collapses the panel. **Level** offers
+**Welcome to Antarctica** (default), **The Journey Begins** and
+[The Somewhat Smaller Bath](PRIVATE_COOP_THIRD_LEVEL.md). Choose before starting;
+after completion, Replay or Next to the adjacent supported level keeps the same
+room and invitation. Arbitrary reselection uses the title/fresh-room flow. The
 existing generation/session/epoch baseline acknowledgment still gates simulation;
 connection readiness does not substitute for a valid scene. The host controls
 Player 1, menus and saves. The guest controls Player 2. Both use the shared camera.

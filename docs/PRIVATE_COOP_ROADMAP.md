@@ -1,14 +1,15 @@
 # SuperTux private browser co-op roadmap
 
-Updated: 2026-10-28 UTC.
+Updated: 2026-11-04 UTC.
 
 The guided phone Host/Join flow (PR #18), bounded room lifetime (PR #19),
 [second level](PRIVATE_COOP_SECOND_LEVEL.md) (PR #20), and checkpoint teammate
-revival (PR #21) are merged. The next coding milestone adds
-[same-room Replay and Next level](PRIVATE_COOP_REPLAY.md), based on merged
-`34d8d40e423129396641ad183fad66c8fe7d0db6`. This keeps one invitation through
-Welcome → Replay or Next Journey → Replay Journey. A general lobby and third
-level remain future work.
+revival (PR #21) are merged. Replay/Next is merged through PR #22 at
+`5551c48a374e30791478100b1e54b9b798c07091`. The current milestone adds
+[The Somewhat Smaller Bath](PRIVATE_COOP_THIRD_LEVEL.md), the next original
+campaign level, with swimming, fish, moving coins and unstable ice. This keeps one invitation through
+Welcome → Journey → Bath and Replay of each. A general lobby and further
+levels remain future work; physical-phone acceptance is still outstanding.
 
 After review/merge, explicitly publish private staging and complete physical
 phone acceptance (8E) with both roles on separate networks. Local browser

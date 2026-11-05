@@ -300,6 +300,32 @@ test('result then transition survive backpressure and hibernation ahead of the n
   await send(room,guest,{type:'seen'});assert.equal(guest.messages.at(-1).type,'result');
   await send(room,guest,{type:'seen'});assert.equal(guest.messages.at(-1).type,'transition');
 });
+
+test('third-level transitions require the adjacent successful result; Bath can only replay',async()=>{
+  const f=fixture(),host=f.add('host'),guest=f.add('guest');await ready(f,host);
+  await send(f.object,guest,{type:'hello',protocol:PROTOCOL,build,view:true});
+  await send(f.object,host,{type:'session',generation:1,enabled:false});
+  await send(f.object,host,campaign());
+  const select=(scene,session=1)=>({type:'transition',session,epoch:1,generation:1,scene});
+  const result=(win,session=1)=>({type:'result',session,epoch:1,generation:1,win});
+  await send(f.object,host,result(true));
+  await send(f.object,host,select('bath-v1'));
+  assert.equal(guest.messages.some(p=>p.type==='transition'),false,'Welcome cannot skip Journey');
+  await send(f.object,host,campaign(1,{session:2,scene:'journey-v1'}));
+  await send(f.object,host,result(false,2));await send(f.object,host,select('bath-v1',2));
+  assert.equal(guest.messages.some(p=>p.type==='transition'),false,'An aborted Journey cannot advance');
+  await send(f.object,host,result(true,2));await send(f.object,host,select('bath-v1',2));
+  assert.equal(guest.messages.at(-1).scene,'bath-v1');
+  const bath=campaign(1,{session:3,scene:'bath-v1'});assert.equal(validView(bath),true);
+  await send(f.object,host,bath);await send(f.object,host,result(true,3));
+  const count=guest.messages.filter(p=>p.type==='transition').length;
+  for(const scene of ['antarctica-v1','journey-v1'])await send(f.object,host,select(scene,3));
+  assert.equal(guest.messages.filter(p=>p.type==='transition').length,count);
+  await send(f.object,host,select('bath-v1',3));assert.equal(guest.messages.at(-1).scene,'bath-v1');
+  await send(f.object,host,select('bath-v1',2));
+  assert.equal(guest.messages.filter(p=>p.type==='transition').length,count+1,'A retired result cannot change the third level');
+  await send(f.object,host,select('unknown',3));assert.equal(host.closed.code,1008);
+});
 test('campaign complete state has bounded geometry, stable unique IDs and no executable or remote resource fields',()=>{
   assert.equal(validView(campaign()),true);
   const mirrored=campaign();mirrored.world.draw[0][3]=4;assert.equal(validView(mirrored),true);
@@ -312,6 +338,23 @@ test('campaign complete state has bounded geometry, stable unique IDs and no exe
     f=>f.world.entities[0][4]='run(script)',f=>f.world.script='execute',
   ]) {const frame=campaign();mutate(frame);assert.equal(validView(frame),false);}
   const bonus=campaign();bonus.players[0].action='big-walk-right';assert.equal(validView(bonus),true);
+});
+
+test('compact texture batches preserve the same logical-quad and numeric bounds',()=>{
+  const f=campaign(),p=f.world.draw[0][7];
+  p[3]=[[0,0,10,20]];p.push([32,32,32,32,0]);
+  p[3].push([0,0,16,16,12,24,8,8,90]);
+  assert.equal(validView(f),true);
+  for (const mutate of [
+    x=>x[5].pop(),x=>x[5][0]=-1,x=>x[5][4]=3601,x=>x[5][2]=NaN,
+    x=>x[3][0].push(0),x=>x[3][0][0]=-1,x=>x[3][0][2]=Infinity,x=>x[3][0]=[10,20],
+  ]) {
+    const bad=structuredClone(f);mutate(bad.world.draw[0][7]);assert.equal(validView(bad),false);
+  }
+  p[5].push(0,0);p[3][0]=[10,20];assert.equal(validView(f),true);
+  const bad=structuredClone(f);bad.world.draw[0][7][5][5]=-1;assert.equal(validView(bad),false);
+  p[3]=Array.from({length:2048},()=>[10,20]);assert.equal(validView(f),true);
+  p[3].push([10,20]);assert.equal(validView(f),false);
 });
 test('second campaign uses the same bounded world validation and retires prior level acknowledgments/results',async()=>{
   const journey=campaign(1,{scene:'journey-v1',session:2});

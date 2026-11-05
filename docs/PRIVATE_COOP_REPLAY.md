@@ -8,16 +8,18 @@ merging; this document does not claim the hosted private link has been updated.
 ## Player flow
 
 Start a private game through the ordinary **Start → Private co-op → Host game**
-flow. Choose Welcome to Antarctica or The Journey Begins, share the invitation,
+flow. Choose Welcome to Antarctica, The Journey Begins or The Somewhat Smaller Bath,
+share the invitation,
 wait for Player 2, and press **Start together**.
 
 When a level ends, both screens show its result. The host can **Replay** that
 level or, after completing Welcome to Antarctica, choose **Next level** to play
 The Journey Begins. Player 2 waits for the host's choice. The room, invitation,
 WebSocket pair and prepared guest artwork are reused; neither player reloads.
-After The Journey Begins, the panel explains that this is the end of the current
-two-level preview. Replay and Close room remain available. There is no third
-level, synchronized world map or general lobby/level selector in this change.
+Journey can now advance to [The Somewhat Smaller Bath](PRIVATE_COOP_THIRD_LEVEL.md),
+which offers Replay, Close room and the end-of-preview message. The original
+Replay milestone covered two levels; its third-level extension retains the same
+room and save lifecycle. A synchronized world map and general lobby remain future work.
 The shared camera and checkpoint teammate revival remain in effect.
 
 The host's native completion record is written before choices become available.
@@ -37,11 +39,12 @@ backgrounding, trusted Resume, lost connections and finite room lifetime.
   and acknowledges the exact result session/epoch. It has no underlying title
   menu that a keyboard, touch or gamepad can navigate while the dialog is open.
 * Host command 6 accepts only that held session/epoch and an allowlisted Replay
-  or successful first-to-second-level transition. It constructs a fresh native
+  or successful adjacent campaign transition. It constructs a fresh native
   GameSession using the same Savegame and resets checkpoint/remote input state.
   Guest input masks cannot invoke it. Repeated actions are ignored while starting.
 * The relay accepts a bounded host-only `transition` after the matching result.
-  It permits the same scene or successful `antarctica-v1` → `journey-v1`, uses
+  It permits the same scene or successful `antarctica-v1` → `journey-v1` →
+  `bath-v1`, uses
   the current input generation, and retires results on a newer session or epoch.
   Coalesced results/transitions survive Durable Object hibernation and arrive
   ahead of the next complete view baseline. Protocol remains 3; exact content
@@ -74,9 +77,9 @@ python tests/wasm/coop_level_smoke.py /path/to/web-release --output evidence/che
 The flow suite runs a compiled host and separate guest through the actual local
 Worker/Durable Object. Host-only placement fixtures enter the original native
 end triggers; this is not an unassisted playthrough. It tests Welcome → Replay →
-Next Journey → Replay Journey in one room, delayed-baseline physics/input gates,
+Next Journey → Replay Journey → Next Bath → Replay Bath in one room, delayed-baseline physics/input gates,
 remote movement, stale result/native command rejection, double-tap protection,
-save failure/retry, trusted Pause/Resume, both solved records after a real reload,
+save failure/retry, trusted Pause/Resume, all three solved records after a real reload,
 no repeat guest artwork/WASM/DATA/music downloads, and portrait/landscape results.
 Screenshots and reports identify the engine, configuration and source manifest.
 Browser emulation and Linux WebKit do not establish physical iPhone acceptance.
@@ -103,7 +106,7 @@ node tools/web/coop/preview.mjs /tmp/supertux-coop 8787
 
 Wait for `INPUT_PROOF_READY`, then open `http://127.0.0.1:8787/index.html` and use
 Private co-op. This address is local to the development machine. The complete
-artifact includes both levels' guest artwork and all startup/deferred host assets.
+artifact includes all three levels' guest artwork and all startup/deferred host assets.
 Do not use a plain static server to test rooms.
 
 After review and merge into `mobile-web-audit`, explicitly request private staging:

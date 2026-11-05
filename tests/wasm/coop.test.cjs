@@ -82,6 +82,24 @@ test('results wait for the native save and persistent flush; a double Next tap s
   assert.equal(engine.finished(10,2,true,0),false,'A retired completion cannot reopen the result screen');
 });
 
+test('Journey can advance only after completion; Bath offers Replay and the preview boundary',async()=>{
+  for (const win of [false,true]) {
+    const f=await completedHost({level:3,win});f.engine.completionReady(10,2);
+    await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(f.elements.get('coop_next').hidden,!win);
+    await f.elements.get('coop_next').fire('click');
+    const command=f.engine.poll();
+    assert.deepEqual(command && Array.from(command),win?[6,4,10,2]:undefined);
+    if(win)assert.equal(f.sockets[0].sent.at(-1).scene,'bath-v1');
+  }
+  const f=await completedHost({level:4});f.engine.completionReady(10,2);
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(f.elements.get('coop_next').hidden,true);
+  assert.equal(f.elements.get('coop_result_end').hidden,false);
+  await f.elements.get('coop_replay').fire('click');
+  assert.deepEqual(Array.from(f.engine.poll()),[6,4,10,2]);
+});
+
 test('failed saves require retry or an explicit visit-only choice, and stale save completion cannot revive a closed room',async()=>{
   const f=await completedHost({save:async()=>false});
   f.engine.completionReady(10,2);await new Promise(resolve=>setImmediate(resolve));
@@ -104,7 +122,7 @@ test('failed saves require retry or an explicit visit-only choice, and stale sav
 });
 
 test('Next is unavailable after an abort or the last supported level; pause and disconnect cannot start a replay',async()=>{
-  for (const options of [{win:false},{level:3}]) {
+  for (const options of [{win:false},{level:4}]) {
     const f=await completedHost(options);f.engine.completionReady(10,2);await new Promise(resolve=>setImmediate(resolve));
     assert.equal(f.elements.get('coop_next').hidden,true);
     await f.elements.get('coop_next').fire('click');assert.equal(f.engine.poll(),undefined);
@@ -225,7 +243,8 @@ test('Start together waits for verified shared-view ownership and repeated taps 
   assert.equal(f.elements.get('coop_invite').hidden,true);
 });
 
-test('host can select the second level, rejects unknown content and locks one pending start', async () => {
+test('host can select each supported campaign level, rejects unknown content and locks one pending start', async () => {
+  for (const chosen of [0,3,4]) {
   const f=fixture(false,roomResponse), engine=f.window.Module.supertuxCoop;
   await f.elements.get('coop_create').fire('click');
   const receive=value=>f.sockets[0].fire('message',{data:JSON.stringify(value)});
@@ -234,11 +253,12 @@ test('host can select the second level, rejects unknown content and locks one pe
   const level=f.elements.get('coop_level'), start=f.elements.get('coop_antarctica');
   level.value='99';await start.fire('click');assert.equal(engine.poll(),undefined);
   assert.equal(engine.state.starting,false);
-  level.value='3';await start.fire('click');await start.fire('click');
-  assert.deepEqual(Array.from(engine.poll()),[5,3,0,0]);assert.equal(engine.poll(),undefined);
+  level.value=String(chosen);await start.fire('click');await start.fire('click');
+  assert.deepEqual(Array.from(engine.poll()),[5,chosen,0,0]);assert.equal(engine.poll(),undefined);
   assert.equal(level.disabled,true);
   engine.engineStatus(1,true,3,1);
   assert.equal(f.elements.get('coop_level_choice').hidden,true);
+  }
 });
 
 test('copy denial offers selected invitation; sharing cancellation does not change room ownership', async () => {

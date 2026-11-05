@@ -258,7 +258,7 @@
   <div id="game_area">
   <details id="coop_panel" hidden>
     <summary>Private co-op</summary>
-    <p>Play the first two Icy Island levels together on two devices. Start from the title screen; the host controls menus and saves.</p>
+    <p>Play the first three Icy Island levels together on two devices. Start from the title screen; the host controls menus and saves.</p>
     <div class="coop_actions"><button id="coop_create" type="button" disabled>Host game</button><button id="coop_close" type="button" hidden>Close room</button></div>
     <p id="coop_status" role="status" aria-live="polite">Press Start, then host a game or join an invitation.</p>
     <div id="coop_invite" hidden>
@@ -270,6 +270,7 @@
     </div>
     <div id="coop_level_choice"><label for="coop_level">Level</label><select id="coop_level">
       <option value="0">Welcome to Antarctica</option><option value="3">The Journey Begins</option>
+      <option value="4">The Somewhat Smaller Bath</option>
     </select></div>
     <div class="coop_actions"><button id="coop_antarctica" type="button" disabled>Start together</button></div>
     <details id="coop_join_form"><summary>Join game</summary><label for="coop_join_url">Invitation from the host</label>

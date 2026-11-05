@@ -36,8 +36,9 @@ Antarctica. The same invitation and connection remain in use. To select an
 arbitrary starting level again, close the room and use Return to title; the host
 flushes saves before reloading and failed saving permits retry. Finite room
 limits and neutral-input, trusted-Resume recovery continue to apply.
-Synchronized world-map navigation and progression beyond these two levels
-remain out of scope.
+The later [third-level extension](PRIVATE_COOP_THIRD_LEVEL.md) adds Next from
+Journey to The Somewhat Smaller Bath. Synchronized world-map navigation remains
+out of scope.
 
 ## Supported content
 
